@@ -1,0 +1,22 @@
+# Web scraping
+requests==2.31.0
+beautifulsoup4==4.12.2
+lxml==5.1.0
+playwright==1.40.0
+
+# Data handling
+python-dateutil==2.8.2
+pytz==2024.1
+
+# Database (start with SQLite, no extra install needed)
+sqlalchemy==2.0.23
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.0
+
+# Development/Testing
+pytest==7.4.3
+black==23.12.0
+flake8==6.1.0
+ipython==8.18.0
