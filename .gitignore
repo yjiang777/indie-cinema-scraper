@@ -91,3 +91,10 @@ debug_output/
 dist/
 build/
 
+
+# Debug output files
+debug/*.html
+debug/*.json
+debug/output/
+debug/*.log
+
