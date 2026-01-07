@@ -98,3 +98,9 @@ debug/*.json
 debug/output/
 debug/*.log
 
+
+# Debug output files
+debug/*.html
+debug/*.json
+debug/output/
+debug/*.log
