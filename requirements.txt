@@ -1,22 +1,28 @@
-# Web scraping
+# Core dependencies
 requests==2.31.0
 beautifulsoup4==4.12.2
 lxml==5.1.0
-playwright==1.40.0
 
-# Data handling
+# Date/Time handling
 python-dateutil==2.8.2
 pytz==2024.1
 
-# Database (start with SQLite, no extra install needed)
+# Database
 sqlalchemy==2.0.23
 
-# Utilities
+# Environment & Configuration
 python-dotenv==1.0.0
+
+# Data validation (optional, for future use)
 pydantic==2.5.0
 
-# Development/Testing
+# Browser automation (for future American Cinematheque/Landmark)
+# playwright==1.40.0  # Commented out - Apple Silicon issues, install when needed
+
+# Development & Testing
 pytest==7.4.3
 black==23.12.0
-flake8==6.1.0
-ipython==8.18.0
+
+# Type hints (optional)
+types-requests==2.31.0.10
+types-pytz==2024.1.0.20240203
