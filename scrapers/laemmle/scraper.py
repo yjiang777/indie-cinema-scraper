@@ -29,13 +29,11 @@ class LaemmleScraper:
             List of screening dictionaries
         """
         url = f"{self.theater_url}?date={date_str}"
-        print(f"   Fetching: {url}")
         
         try:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
         except requests.RequestException as e:
-            print(f"   ❌ Error fetching {url}: {e}")
             return []
         
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -140,8 +138,6 @@ class LaemmleScraper:
             
             screenings = self.scrape_date(date_str)
             all_screenings.extend(screenings)
-            
-            print(f"   Found {len(screenings)} screenings for {date_str}")
         
         return all_screenings
     
@@ -185,5 +181,4 @@ class LaemmleScraper:
             return dt_pacific
             
         except Exception as e:
-            print(f"   ⚠️  Error parsing datetime '{date_str} {time_str}': {e}")
             return None

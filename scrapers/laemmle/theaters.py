@@ -49,12 +49,5 @@ LAEMMLE_THEATERS = [
         "state": "CA",
         "url": "https://www.laemmle.com/theater/claremont-5",
         "address": "450 W 2nd St, Claremont, CA 91711"
-    },
-    {
-        "name": "Laemmle Playhouse 7",
-        "city": "Pasadena",
-        "state": "CA",
-        "url": "https://www.laemmle.com/theater/playhouse-7",
-        "address": "673 E Colorado Blvd, Pasadena, CA 91101"
     }
 ]

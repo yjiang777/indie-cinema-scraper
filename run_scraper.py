@@ -99,26 +99,33 @@ def show_summary(session):
     print(f"🎬 Movies: {movie_count}")
     print(f"🎫 Screenings: {screening_count}")
     
-    # Show next 10 upcoming screenings
+    # Show next 3 upcoming screenings per theater
     pacific_tz = pytz.timezone('America/Los_Angeles')
     now = datetime.now(pacific_tz)
     
-    upcoming = session.query(Screening).join(Movie).join(Theater)\
-        .filter(Screening.screening_datetime >= now)\
-        .order_by(Screening.screening_datetime)\
-        .limit(10)\
-        .all()
+    print("\n📅 Upcoming Screenings by Theater:")
+    print("="*60)
     
-    if upcoming:
-        print("\n📅 Next 10 Upcoming Screenings:")
-        for screening in upcoming:
-            dt = screening.screening_datetime.strftime("%a %b %d, %I:%M %p")
-            print(f"\n{dt} - {screening.movie.title}")
-            print(f"   📍 {screening.theater.name}")
-            if screening.movie.format:
-                print(f"   🎞️  {screening.movie.format}")
-            if screening.ticket_url:
-                print(f"   🔗 {screening.ticket_url}")
+    theaters = session.query(Theater).order_by(Theater.name).all()
+    
+    for theater in theaters:
+        upcoming = session.query(Screening).join(Movie)\
+            .filter(Screening.theater_id == theater.id)\
+            .filter(Screening.screening_datetime >= now)\
+            .order_by(Screening.screening_datetime)\
+            .limit(3)\
+            .all()
+        
+        if upcoming:
+            print(f"\n🎭 {theater.name}")
+            for screening in upcoming:
+                dt = screening.screening_datetime.strftime("%a %b %d, %I:%M %p")
+                format_str = f" ({screening.movie.format})" if screening.movie.format and screening.movie.format != 'Digital' else ""
+                print(f"   • {dt} - {screening.movie.title}{format_str}")
+        else:
+            print(f"\n🎭 {theater.name}")
+            print(f"   (No upcoming screenings)")
+
 
 
 def scrape_new_beverly(session):
@@ -165,17 +172,14 @@ def scrape_new_beverly(session):
 def scrape_laemmle(session):
     """Scrape all Laemmle Theatres"""
     print("\n" + "="*60)
-    print("🎬 LAEMMLE THEATRES SCRAPER")
+    print("🎬 LAEMMLE THEATRES SCRAPER (7 locations)")
     print("="*60)
     
     total_new_screenings = 0
+    total_scraped = 0
     
-    for theater_info in LAEMMLE_THEATERS:
-        print(f"\n{'='*60}")
-        print(f"📍 {theater_info['name']}")
-        print(f"{'='*60}")
-        
-        # Create/get theater
+    for i, theater_info in enumerate(LAEMMLE_THEATERS, 1):
+        # Create/get theater (quietly)
         theater = get_or_create_theater(
             session,
             name=theater_info['name'],
@@ -185,15 +189,16 @@ def scrape_laemmle(session):
             website=theater_info['url']
         )
         
-        # Scrape schedule (next 7 days)
+        # Scrape schedule
+        print(f"\n[{i}/{len(LAEMMLE_THEATERS)}] {theater_info['name']}...", end='', flush=True)
+        
         scraper = LaemmleScraper(theater_info['url'], theater_info['name'])
-        print("\n🔍 Scraping next 7 days...")
-        screenings = scraper.scrape_multiple_dates(num_days=7)
+        screenings = scraper.scrape_multiple_dates(num_days=3)  # Reduced to 3 days
         
-        # Save to database
-        print(f"\n💾 Saving {len(screenings)} screenings to database...")
+        print(f" {len(screenings)} screenings", end='', flush=True)
+        
+        # Save to database (quietly)
         new_count = 0
-        
         for screening_data in screenings:
             movie = get_or_create_movie(
                 session,
@@ -205,14 +210,117 @@ def scrape_laemmle(session):
             if save_screening(session, movie, theater, screening_data):
                 new_count += 1
         
-        print(f"✅ Added {new_count} new screenings from {theater_info['name']}")
+        total_scraped += len(screenings)
         total_new_screenings += new_count
+        
+        print(f" → {new_count} new")
     
     print(f"\n{'='*60}")
-    print(f"✅ TOTAL: Added {total_new_screenings} new screenings across all Laemmle theaters")
+    print(f"✅ Laemmle: {total_new_screenings} new screenings (scraped {total_scraped} total)")
     print(f"{'='*60}")
 
-
+def scrape_american_cinematheque(session):
+    """Scrape American Cinematheque theaters"""
+    print("\n" + "="*60)
+    print("🎬 AMERICAN CINEMATHEQUE SCRAPER")
+    print("="*60)
+    
+    from scrapers.american_cinematheque.scraper import AmericanCinemathequeAPI
+    from scrapers.american_cinematheque.theaters import AMERICAN_CINEMATHEQUE_THEATERS
+    
+    # Create theaters in database
+    theaters_by_id = {}
+    for theater_info in AMERICAN_CINEMATHEQUE_THEATERS:
+        theater = get_or_create_theater(
+            session,
+            name=theater_info['name'],
+            address=theater_info['address'],
+            city=theater_info['city'],
+            state=theater_info['state'],
+            website="https://www.americancinematheque.com"
+        )
+        theaters_by_id[theater_info['api_id']] = theater
+    
+    # Scrape next 14 days
+    api = AmericanCinemathequeAPI()
+    print("\n🔍 Scraping next 14 days from API...")
+    screenings = api.scrape_next_days(num_days=14)
+    
+    print(f"\n💾 Saving {len(screenings)} screenings to database...")
+    new_count = 0
+    
+    for screening_data in screenings:
+        # Get theater from API ID
+        theater_id = screening_data.get('theater_id')
+        theater = theaters_by_id.get(theater_id)
+        
+        if not theater:
+            print(f"   ⚠️  Unknown theater ID: {theater_id}")
+            continue
+        
+        # Create movie
+        movie = get_or_create_movie(
+            session,
+            title=screening_data['title'],
+            runtime=screening_data.get('runtime'),
+            movie_format=screening_data.get('format')
+        )
+        
+        # Create screening
+        if save_screening(session, movie, theater, screening_data):
+            new_count += 1
+    
+    print(f"\n✅ Added {new_count} new screenings from American Cinematheque")
+def scrape_landmark(session):
+    """Scrape Landmark Theatres"""
+    print("\n" + "="*60)
+    print("🎬 LANDMARK THEATRES SCRAPER (1 location)")
+    print("="*60)
+    
+    from scrapers.landmark.scraper import LandmarkAPI
+    from scrapers.landmark.theaters import LANDMARK_THEATERS
+    
+    total_new_screenings = 0
+    
+    for theater_info in LANDMARK_THEATERS:
+        print(f"\n📍 {theater_info['name']}...", end='', flush=True)
+        
+        # Create/get theater
+        theater = get_or_create_theater(
+            session,
+            name=theater_info['name'],
+            address=theater_info['address'],
+            city=theater_info['city'],
+            state=theater_info['state'],
+            website="https://www.landmarktheatres.com"
+        )
+        
+        # Scrape schedule
+        api = LandmarkAPI(theater_info['api_id'], theater_info['timezone'])
+        screenings = api.scrape_next_days(num_days=7)
+        
+        print(f" {len(screenings)} screenings", end='', flush=True)
+        
+        # Save to database
+        new_count = 0
+        for screening_data in screenings:
+            movie = get_or_create_movie(
+                session,
+                title=screening_data['title'],
+                runtime=screening_data.get('runtime'),
+                movie_format=screening_data.get('format')
+            )
+            
+            if save_screening(session, movie, theater, screening_data):
+                new_count += 1
+        
+        total_new_screenings += new_count
+        print(f" → {new_count} new")
+    
+    print(f"\n{'='*60}")
+    print(f"✅ Landmark: {total_new_screenings} new screenings")
+    print(f"{'='*60}")
+    
 def main():
     """Main scraper execution"""
     # Setup database
@@ -227,6 +335,12 @@ def main():
         
         # Scrape Laemmle Theatres
         scrape_laemmle(session)
+        
+        # Scrape American Cinematheque
+        scrape_american_cinematheque(session)
+        
+        # Scrape Landmark Theatres
+        scrape_landmark(session)
         
         # Show summary
         show_summary(session)
