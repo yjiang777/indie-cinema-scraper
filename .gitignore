@@ -104,3 +104,23 @@ debug/*.html
 debug/*.json
 debug/output/
 debug/*.log
+
+# Scripts output
+scripts/*.db
+scripts/*.csv
+scripts/output/
+
+# Scripts folder
+scripts/debug_*.py        # Don't track one-off debug scripts
+scripts/*.db              # Ignore database copies in scripts
+scripts/*.csv             # Ignore any CSV exports
+scripts/output/           # Ignore output folder
+scripts/__pycache__/      # Python cache
+
+# Keep these scripts (already added, just documenting):
+# scripts/enrich_movies_with_tmdb.py
+# scripts/fix_special_cases.py
+# scripts/check_missing_directors.py
+# scripts/recon_theaters.py
+# scripts/debug_tmdb_search.py
+# scripts/README.md

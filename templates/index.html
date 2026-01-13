@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="search-box">
+    <div class="search-row">
+        <input type="text" 
+               id="searchInput" 
+               class="search-input" 
+               placeholder="Search movies..."
+               onkeyup="handleSearch(event)">
+        
+        <select id="theaterFilter" onchange="filterScreenings()">
+            <option value="">All Theaters</option>
+            {% for theater in theaters %}
+            <option value="{{ theater.id }}">{{ theater.name }}</option>
+            {% endfor %}
+        </select>
+        
+        <select id="dateFilter" onchange="filterScreenings()">
+            <option value="week">This Week</option>
+            <option value="today">Today</option>
+            <option value="month">This Month</option>
+            <option value="all">All Upcoming</option>
+        </select>
+        
+        <select id="formatFilter" onchange="filterScreenings()">
+            <option value="">All Formats</option>
+            <option value="35mm">35mm</option>
+            <option value="70mm">70mm</option>
+            <option value="Digital">Digital</option>
+        </select>
+        
+        <button onclick="filterScreenings()">Search</button>
+    </div>
+</div>
+
+<div id="results">
+    {% if screenings %}
+        <div id="screeningsList">
+            {% for screening in screenings %}
+            <div class="screening-card">
+                <div class="screening-header">
+                    <div>
+                        <div class="movie-title">
+                            {{ screening.movie_title }}
+                            {% if screening.format != 'Digital' %}
+                            <span class="format-badge special">{{ screening.format }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="screening-info">
+                            <span>📍 <span class="theater-name">{{ screening.theater_name }}</span></span>
+                            <span>📅 {{ screening.formatted_date }}</span>
+                            <span>🕐 {{ screening.formatted_time }}</span>
+                            {% if screening.runtime %}
+                            <span>⏱️ {{ screening.runtime }} min</span>
+                            {% endif %}
+                        </div>
+                        {% if screening.special_notes %}
+                        <div style="color: #666; margin-top: 5px;">
+                            ℹ️ {{ screening.special_notes }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div>
+                        {% if screening.ticket_url %}
+                        <a href="{{ screening.ticket_url }}" target="_blank" class="ticket-link">
+                            Get Tickets →
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="no-results">
+            <h2>No screenings found</h2>
+            <p>Try adjusting your filters or check back later</p>
+        </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function handleSearch(event) {
+    if (event.key === 'Enter') {
+        filterScreenings();
+    }
+}
+
+async function filterScreenings() {
+    const query = document.getElementById('searchInput').value;
+    const theater = document.getElementById('theaterFilter').value;
+    const date = document.getElementById('dateFilter').value;
+    const format = document.getElementById('formatFilter').value;
+    
+    // Show loading
+    document.getElementById('results').innerHTML = '<div class="loading">Loading...</div>';
+    
+    // Build query string
+    const params = new URLSearchParams();
+    if (query) params.append('q', query);
+    if (theater) params.append('theater', theater);
+    if (date) params.append('date', date);
+    if (format) params.append('format', format);
+    
+    try {
+        const response = await fetch(`/search?${params.toString()}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            displayScreenings(data.screenings);
+        } else {
+            document.getElementById('results').innerHTML = 
+                '<div class="no-results"><h2>Error loading screenings</h2></div>';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('results').innerHTML = 
+            '<div class="no-results"><h2>Error loading screenings</h2></div>';
+    }
+}
+
+function displayScreenings(screenings) {
+    const resultsDiv = document.getElementById('results');
+    
+    if (screenings.length === 0) {
+        resultsDiv.innerHTML = `
+            <div class="no-results">
+                <h2>No screenings found</h2>
+                <p>Try adjusting your filters or check back later</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '<div id="screeningsList">';
+    
+    screenings.forEach(screening => {
+        const formatBadge = screening.format !== 'Digital' 
+            ? `<span class="format-badge special">${screening.format}</span>` 
+            : '';
+        
+        const runtime = screening.runtime 
+            ? `<span>⏱️ ${screening.runtime} min</span>` 
+            : '';
+        
+        const notes = screening.special_notes 
+            ? `<div style="color: #666; margin-top: 5px;">ℹ️ ${screening.special_notes}</div>` 
+            : '';
+        
+        const ticketLink = screening.ticket_url 
+            ? `<a href="${screening.ticket_url}" target="_blank" class="ticket-link">Get Tickets →</a>` 
+            : '';
+        
+        html += `
+            <div class="screening-card">
+                <div class="screening-header">
+                    <div>
+                        <div class="movie-title">
+                            ${screening.movie_title}
+                            ${formatBadge}
+                        </div>
+                        <div class="screening-info">
+                            <span>📍 <span class="theater-name">${screening.theater_name}</span></span>
+                            <span>📅 ${screening.formatted_date}</span>
+                            <span>🕐 ${screening.formatted_time}</span>
+                            ${runtime}
+                        </div>
+                        ${notes}
+                    </div>
+                    <div>
+                        ${ticketLink}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    resultsDiv.innerHTML = html;
+}
+</script>
+{% endblock %}

@@ -320,29 +320,60 @@ def scrape_landmark(session):
     print(f"\n{'='*60}")
     print(f"✅ Landmark: {total_new_screenings} new screenings")
     print(f"{'='*60}")
+def scrape_usc_cinema(session):
+    """Scrape USC Cinema"""
+    print("\n" + "="*60)
+    print("🎬 USC CINEMA SCRAPER")
+    print("="*60)
     
+    from scrapers.usc_cinema.scraper import USCCinemaScraper
+    from scrapers.usc_cinema.theater import USC_CINEMA_THEATER
+    
+    # Create/get theater
+    theater = get_or_create_theater(
+        session,
+        name=USC_CINEMA_THEATER['name'],
+        address=USC_CINEMA_THEATER['address'],
+        city=USC_CINEMA_THEATER['city'],
+        state=USC_CINEMA_THEATER['state'],
+        website=USC_CINEMA_THEATER['website']
+    )
+    
+    # Scrape schedule
+    scraper = USCCinemaScraper()
+    print("\n🔍 Scraping schedule...")
+    screenings = scraper.scrape_schedule()
+    
+    print(f"\n💾 Saving {len(screenings)} screenings to database...")
+    new_count = 0
+    
+    for screening_data in screenings:
+        movie = get_or_create_movie(
+            session,
+            title=screening_data['title'],
+            runtime=screening_data.get('runtime'),
+            movie_format=screening_data.get('format')
+        )
+        
+        if save_screening(session, movie, theater, screening_data):
+            new_count += 1
+    
+    print(f"✅ Added {new_count} new screenings from USC Cinema")
+
 def main():
     """Main scraper execution"""
-    # Setup database
     ensure_database_exists()
     init_db()
     
     session = SessionLocal()
     
     try:
-        # Scrape New Beverly
         scrape_new_beverly(session)
-        
-        # Scrape Laemmle Theatres
         scrape_laemmle(session)
-        
-        # Scrape American Cinematheque
         scrape_american_cinematheque(session)
-        
-        # Scrape Landmark Theatres
         scrape_landmark(session)
+        scrape_usc_cinema(session)  # ← Add this
         
-        # Show summary
         show_summary(session)
         
     finally:
