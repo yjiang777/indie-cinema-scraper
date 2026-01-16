@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    #map {
+        height: 500px;
+        width: 100%;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .distance-controls {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .distance-slider {
+        width: 100%;
+        margin: 10px 0;
+    }
+    
+    .theater-list-item {
+        background: white;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .theater-list-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    
+    .theater-name {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .theater-distance {
+        color: #667eea;
+        font-weight: 600;
+    }
+    
+    .nav-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    
+    .nav-tab {
+        padding: 10px 20px;
+        background: white;
+        border: 2px solid #667eea;
+        border-radius: 5px;
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+    
+    .nav-tab:hover {
+        background: #667eea;
+        color: white;
+    }
+    
+    .nav-tab.active {
+        background: #667eea;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="nav-tabs">
+    <a href="/" class="nav-tab">🎬 Browse Screenings</a>
+    <a href="/map" class="nav-tab active">🗺️ Map View</a>
+</div>
+
+<div class="distance-controls">
+    <h3>Find Theaters Near You</h3>
+    <button id="getLocationBtn" onclick="getUserLocation()" style="margin-bottom: 15px;">
+        📍 Use My Location
+    </button>
+    <div id="locationStatus" style="color: #666; margin-bottom: 10px;"></div>
+    
+    <div id="distanceControl" style="display: none;">
+        <label for="distanceSlider">Show theaters within: <span id="distanceValue">25</span> miles</label>
+        <input type="range" id="distanceSlider" class="distance-slider" min="1" max="50" value="25" oninput="updateDistance()">
+    </div>
+</div>
+
+<div id="map"></div>
+
+<div id="theaterList"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let map;
+let userLocation = null;
+let userMarker = null;
+let radiusCircle = null;
+let theaterMarkers = [];
+let maxDistance = 25;
+
+// Initialize map
+function initMap() {
+    // Center on LA
+    map = L.map('map').setView([34.0522, -118.2437], 10);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    
+    // Load all theaters
+    loadTheaters();
+}
+
+async function loadTheaters() {
+    try {
+        let url = '/api/theaters';
+        
+        // Add user location params if available
+        if (userLocation) {
+            url += `?lat=${userLocation.lat}&lon=${userLocation.lon}&max_distance=${maxDistance}`;
+        }
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success) {
+            displayTheaters(data.theaters);
+        }
+    } catch (error) {
+        console.error('Error loading theaters:', error);
+    }
+}
+
+function displayTheaters(theaters) {
+    // Clear existing markers
+    theaterMarkers.forEach(marker => map.removeLayer(marker));
+    theaterMarkers = [];
+    
+    // Add theater markers
+    theaters.forEach(theater => {
+        if (theater.latitude && theater.longitude) {
+            const marker = L.marker([theater.latitude, theater.longitude], {
+                icon: L.divIcon({
+                    className: 'theater-marker',
+                    html: '🎬',
+                    iconSize: [30, 30]
+                })
+            });
+            
+            marker.bindPopup(`
+                <div style="min-width: 200px;">
+                    <h3 style="margin: 0 0 10px 0;">${theater.name}</h3>
+                    <p style="margin: 0 0 5px 0;">${theater.address}</p>
+                    ${theater.distance ? `<p style="color: #667eea; font-weight: bold; margin: 5px 0;">${theater.distance} miles away</p>` : ''}
+                    <button onclick="showTheaterScreenings(${theater.id}, '${theater.name}')" style="margin-top: 10px; padding: 8px 15px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        View Screenings
+                    </button>
+                </div>
+            `);
+            
+            marker.addTo(map);
+            theaterMarkers.push(marker);
+        }
+    });
+    
+    // Display theater list
+    displayTheaterList(theaters);
+}
+
+function displayTheaterList(theaters) {
+    const listDiv = document.getElementById('theaterList');
+    
+    if (theaters.length === 0) {
+        listDiv.innerHTML = '<div class="no-results"><h2>No theaters found in this area</h2><p>Try increasing the distance</p></div>';
+        return;
+    }
+    
+    let html = `<h2 style="margin-bottom: 15px;">Theaters ${userLocation ? 'Near You' : 'in LA'} (${theaters.length})</h2>`;
+    
+    theaters.forEach(theater => {
+        html += `
+            <div class="theater-list-item" onclick="showTheaterScreenings(${theater.id}, '${theater.name}')">
+                <div class="theater-name">${theater.name}</div>
+                <div style="color: #666;">${theater.address}</div>
+                ${theater.distance ? `<div class="theater-distance">📍 ${theater.distance} miles away</div>` : ''}
+            </div>
+        `;
+    });
+    
+    listDiv.innerHTML = html;
+}
+
+async function getUserLocation() {
+    const btn = document.getElementById('getLocationBtn');
+    const status = document.getElementById('locationStatus');
+    
+    btn.disabled = true;
+    btn.textContent = 'Getting location...';
+    status.textContent = 'Requesting location permission...';
+    
+    if (!navigator.geolocation) {
+        status.textContent = '❌ Geolocation not supported';
+        btn.disabled = false;
+        btn.textContent = '📍 Use My Location';
+        return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            userLocation = {
+                lat: position.coords.latitude,
+                lon: position.coords.longitude
+            };
+            
+            status.textContent = `✅ Location found: ${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
+            btn.textContent = '✅ Location Set';
+            
+            // Show distance control
+            document.getElementById('distanceControl').style.display = 'block';
+            
+            // Add user marker
+            if (userMarker) {
+                map.removeLayer(userMarker);
+            }
+            
+            userMarker = L.marker([userLocation.lat, userLocation.lon], {
+                icon: L.divIcon({
+                    className: 'user-marker',
+                    html: '📍',
+                    iconSize: [30, 30]
+                })
+            }).addTo(map);
+            
+            userMarker.bindPopup('You are here').openPopup();
+            
+            // Add radius circle
+            updateRadiusCircle();
+            
+            // Center map on user
+            map.setView([userLocation.lat, userLocation.lon], 11);
+            
+            // Reload theaters with distance
+            loadTheaters();
+        },
+        (error) => {
+            status.textContent = '❌ Could not get location: ' + error.message;
+            btn.disabled = false;
+            btn.textContent = '📍 Use My Location';
+        }
+    );
+}
+
+function updateDistance() {
+    maxDistance = document.getElementById('distanceSlider').value;
+    document.getElementById('distanceValue').textContent = maxDistance;
+    
+    updateRadiusCircle();
+    loadTheaters();
+}
+
+function updateRadiusCircle() {
+    if (!userLocation) return;
+    
+    if (radiusCircle) {
+        map.removeLayer(radiusCircle);
+    }
+    
+    // Convert miles to meters
+    const radiusInMeters = maxDistance * 1609.34;
+    
+    radiusCircle = L.circle([userLocation.lat, userLocation.lon], {
+        color: '#667eea',
+        fillColor: '#667eea',
+        fillOpacity: 0.1,
+        radius: radiusInMeters
+    }).addTo(map);
+}
+
+async function showTheaterScreenings(theaterId, theaterName) {
+    // Open modal or redirect
+    window.location.href = `/?theater=${theaterId}`;
+}
+
+// Initialize map when page loads
+initMap();
+</script>
+{% endblock %}

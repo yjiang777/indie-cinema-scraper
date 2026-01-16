@@ -11,7 +11,7 @@ from scrapers.models.base import SessionLocal, init_db
 from scrapers.models.movie import Movie
 from scrapers.models.theater import Theater
 from scrapers.models.screening import Screening
-from scrapers.tmdb_service import TMDBService
+from scrapers.services.tmdb_service import TMDBService
 import re
 
 init_db()
@@ -55,6 +55,7 @@ for movie in movies:
             continue
     
     # Check if it's a TV episode (contains "Season" or "Ep.")
+# Check if it's a TV episode (contains "Season" or "Ep.")
     if 'season' in movie.title.lower() or 'ep.' in movie.title.lower():
         # Extract show name (everything before "Season" or ":")
         show_match = re.match(r'([^:]+)', movie.title)
@@ -63,10 +64,19 @@ for movie in movies:
             show_name = show_match.group(1).strip()
             print(f"\n  TV show detected: {show_name}")
             
-            # Mark as TV Series
-            movie.director = "TV Series"
-            session.commit()
-            print(f"  ✅ Marked as TV Series")
+            # Search TMDB TV database
+            tv_data = tmdb.search_tv_show(show_name, movie.year)
+            
+            if tv_data and tv_data['creator']:
+                # Store creator with special prefix to distinguish from director
+                movie.director = f"TV:{tv_data['creator']}"
+                session.commit()
+                print(f"  ✅ Creator: {tv_data['creator']}")
+            else:
+                # Fallback to generic "TV Series"
+                movie.director = "TV Series"
+                session.commit()
+                print(f"  ⚠️  Could not find creator, marked as TV Series")
             
             continue
     

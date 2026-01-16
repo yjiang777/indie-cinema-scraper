@@ -360,6 +360,61 @@ def scrape_usc_cinema(session):
     
     print(f"✅ Added {new_count} new screenings from USC Cinema")
 
+def scrape_regal(session):
+    """Scrape Regal Theatres"""
+    print("\n" + "="*60)
+    print("🎬 REGAL THEATRES SCRAPER")
+    print("="*60)
+    
+    from scrapers.regal.scraper import RegalScraper
+    from scrapers.regal.theaters import REGAL_THEATERS
+    
+    total_new_screenings = 0
+    
+    for theater_info in REGAL_THEATERS:
+        print(f"\n📍 {theater_info['name']}...", end='', flush=True)
+        
+        # Create/get theater
+        theater = get_or_create_theater(
+            session,
+            name=theater_info['name'],
+            address=theater_info['address'],
+            city=theater_info['city'],
+            state=theater_info['state'],
+            website=theater_info['url']
+        )
+        
+        # Scrape schedule
+        scraper = RegalScraper(
+            theater_url=theater_info['url'],
+            theater_code=theater_info['theater_code'],
+            timezone=theater_info['timezone']
+        )
+        
+        screenings = scraper.scrape_schedule()
+        
+        print(f" {len(screenings)} screenings", end='', flush=True)
+        
+        # Save to database
+        new_count = 0
+        for screening_data in screenings:
+            movie = get_or_create_movie(
+                session,
+                title=screening_data['title'],
+                runtime=screening_data.get('runtime'),
+                movie_format=screening_data.get('format')
+            )
+            
+            if save_screening(session, movie, theater, screening_data):
+                new_count += 1
+        
+        total_new_screenings += new_count
+        print(f" → {new_count} new")
+    
+    print(f"\n{'='*60}")
+    print(f"✅ Regal: {total_new_screenings} new screenings")
+    print(f"{'='*60}")
+
 def main():
     """Main scraper execution"""
     ensure_database_exists()
@@ -372,7 +427,8 @@ def main():
         scrape_laemmle(session)
         scrape_american_cinematheque(session)
         scrape_landmark(session)
-        scrape_usc_cinema(session)  # ← Add this
+        scrape_usc_cinema(session)
+        scrape_regal(session)  # ← Add this line
         
         show_summary(session)
         

@@ -124,3 +124,26 @@ scripts/__pycache__/      # Python cache
 # scripts/recon_theaters.py
 # scripts/debug_tmdb_search.py
 # scripts/README.md
+.env
+
+# Database files
+*.db
+*.db-journal
+
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store

@@ -29,3 +29,5 @@ types-pytz==2024.1.0.20240203
 flask==3.0.0
 tmdbsimple==2.9.1
 tmdbsimple==2.9.1
+geopy==2.4.1
+rapidfuzz==3.6.1
