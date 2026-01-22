@@ -1,15 +1,56 @@
-"""Flask web interface for indie cinema scraper"""
-from flask import Flask, render_template, request, jsonify
+from sqlalchemy import text, func
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+import os
 from datetime import datetime, timedelta
 import pytz
-from sqlalchemy import func
 
-from scrapers.models.base import SessionLocal
+from scrapers.models.base import SessionLocal, init_db
 from scrapers.models.theater import Theater
 from scrapers.models.movie import Movie
 from scrapers.models.screening import Screening
+from scrapers.models.user import User
 
+# Initialize database
+init_db()
+
+# Create Flask app FIRST
 app = Flask(__name__)
+
+# Set secret key IMMEDIATELY
+app.secret_key = os.environ.get('SECRET_KEY')
+if not app.secret_key:
+    raise ValueError("SECRET_KEY environment variable not set")
+
+# Development configs to prevent 403 issues
+if app.debug:
+    app.config['SESSION_COOKIE_SAMESITE'] = None
+    app.config['SESSION_COOKIE_SECURE'] = False
+    
+# Session settings
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['SESSION_COOKIE_NAME'] = 'indie_cinema_dev'  # Unique name
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+
+
+# THEN initialize Flask-Login and attach to app
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    db_session = SessionLocal()
+    user = db_session.get(User, int(user_id))  # ← Changed from query().get()
+    db_session.close()
+    return user
+
+# Add this context processor to make current_user available in templates
+@app.context_processor
+def inject_user():
+    return dict(current_user=current_user)
 
 # Pacific timezone
 pacific_tz = pytz.timezone('America/Los_Angeles')
@@ -22,8 +63,7 @@ def index():
     
     try:
         now = datetime.now(pacific_tz)
-        now_naive = now.replace(tzinfo=None)
-        
+
         # Get theaters for filter dropdown
         theaters = session.query(Theater).order_by(Theater.name).all()
         
@@ -82,8 +122,7 @@ def search():
         format_filter = request.args.get('format', '')
         
         now = datetime.now(pacific_tz)
-        now_naive = now.replace(tzinfo=None)
-        
+
         # Build query
         screenings_query = session.query(Screening).join(Movie).join(Theater)\
             .filter(Screening.screening_datetime >= now)
@@ -163,8 +202,7 @@ def directors():
     
     try:
         now = datetime.now(pacific_tz)
-        now_naive = now.replace(tzinfo=None)
-        
+
         # Get unique directors with screening counts
         directors_query = session.query(
             Movie.director,
@@ -200,7 +238,6 @@ def stats():
     
     try:
         now = datetime.now(pacific_tz)
-        now_naive = now.replace(tzinfo=None)
 
         theater_count = session.query(Theater).count()
         movie_count = session.query(Movie).count()
@@ -276,8 +313,7 @@ def api_theater_screenings(theater_id):
     
     try:
         now = datetime.now(pacific_tz)
-        now_naive = now.replace(tzinfo=None)
-        
+
         screenings = session.query(Screening).join(Movie).join(Theater)\
             .filter(Theater.id == theater_id)\
             .filter(Screening.screening_datetime >= now)\
@@ -327,6 +363,260 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     r = 3956
     
     return c * r
+    
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    """User signup"""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        name = request.form.get('name')
+        
+        db_session = SessionLocal()
+        
+        # Check if user exists
+        existing_user = db_session.query(User).filter_by(email=email).first()
+        if existing_user:
+            flash('Email already registered', 'error')
+            db_session.close()
+            return redirect(url_for('signup'))
+        
+        # Create new user
+        password_hash = generate_password_hash(password)
+        new_user = User(email=email, password_hash=password_hash, name=name)
+        db_session.add(new_user)
+        db_session.commit()
+        
+        # Refresh to get the ID
+        db_session.refresh(new_user)
+        
+        login_user(new_user, remember = True)
+        db_session.close()
+        
+        flash('Account created successfully!', 'success')
+        return redirect(url_for('index'))
+    
+    return render_template('signup.html')
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """User login"""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        session = SessionLocal()
+        user = session.query(User).filter_by(email=email).first()
+        
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user, remember = True)
+            session.close()
+            flash('Logged in successfully!', 'success')
+            return redirect(url_for('index'))
+        else:
+            session.close()
+            flash('Invalid email or password', 'error')
+            return redirect(url_for('login'))
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    """User logout"""
+    logout_user()
+    flash('Logged out successfully', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """User dashboard"""
+    db_session = SessionLocal()
+    
+    # Get all theaters for the dropdown
+    all_theaters = db_session.query(Theater).order_by(Theater.name).all()
+    
+    # Get user's favorite theaters
+    favorite_theaters = db_session.execute(text("""
+        SELECT t.* FROM theaters t
+        JOIN favorite_theaters ft ON ft.theater_id = t.id
+        WHERE ft.user_id = :user_id
+        ORDER BY t.name
+    """), {'user_id': current_user.id}).fetchall()
+    
+    # Get user's favorite directors
+    favorite_directors = db_session.execute(text("""
+        SELECT * FROM favorite_directors
+        WHERE user_id = :user_id
+        ORDER BY director_name
+    """), {'user_id': current_user.id}).fetchall()
+    
+    # Get watchlist with movie and theater details
+    watchlist_raw = db_session.execute(text("""
+        SELECT w.*, s.screening_datetime, m.title, m.director, t.name as theater_name, s.id as screening_id
+        FROM watchlist w
+        JOIN screenings s ON w.screening_id = s.id
+        JOIN movies m ON s.movie_id = m.id
+        JOIN theaters t ON s.theater_id = t.id
+        WHERE w.user_id = :user_id
+        ORDER BY s.screening_datetime
+    """), {'user_id': current_user.id}).fetchall()
+    
+    # Parse datetime strings into datetime objects
+    watchlist = []
+    for item in watchlist_raw:
+        watchlist_item = {
+            'screening_id': item.screening_id,
+            'title': item.title,
+            'director': item.director,
+            'theater_name': item.theater_name,
+            'screening_datetime': datetime.strptime(item.screening_datetime, '%Y-%m-%d %H:%M:%S.%f')
+        }
+        watchlist.append(watchlist_item)
+    
+    db_session.close()
+    
+    return render_template('dashboard.html', 
+                         all_theaters=all_theaters,
+                         favorite_theaters=favorite_theaters,
+                         favorite_directors=favorite_directors,
+                         watchlist=watchlist)
+
+# Favorites API endpoints
+# Add favorite theater
+@app.route('/api/favorites/theater', methods=['POST'])
+@login_required
+def add_favorite_theater():
+    data = request.get_json()
+    theater_id = data.get('theater_id')
+    db_session = SessionLocal()
+    try:
+        db_session.execute(text("""
+            INSERT OR IGNORE INTO favorite_theaters (user_id, theater_id)
+            VALUES (:user_id, :theater_id)
+        """), {'user_id': current_user.id, 'theater_id': theater_id})
+        db_session.commit()
+        db_session.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        db_session.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Remove favorite theater
+@app.route('/api/favorites/theater/<int:theater_id>', methods=['DELETE'])
+@login_required
+def remove_favorite_theater(theater_id):
+    db_session = SessionLocal()
+    try:
+        db_session.execute(text("""
+            DELETE FROM favorite_theaters
+            WHERE user_id = :user_id AND theater_id = :theater_id
+        """), {'user_id': current_user.id, 'theater_id': theater_id})
+        db_session.commit()
+        db_session.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        db_session.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Add favorite director
+@app.route('/api/favorites/director', methods=['POST'])
+@login_required
+def add_favorite_director():
+    data = request.get_json()
+    director_name = data.get('director_name')
+    db_session = SessionLocal()
+    try:
+        db_session.execute(text("""
+            INSERT OR IGNORE INTO favorite_directors (user_id, director_name)
+            VALUES (:user_id, :director_name)
+        """), {'user_id': current_user.id, 'director_name': director_name})
+        db_session.commit()
+        db_session.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        db_session.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Remove favorite director
+@app.route('/api/favorites/director/<path:director_name>', methods=['DELETE'])
+@login_required
+def remove_favorite_director(director_name):
+    db_session = SessionLocal()
+    try:
+        db_session.execute(text("""
+            DELETE FROM favorite_directors
+            WHERE user_id = :user_id AND director_name = :director_name
+        """), {'user_id': current_user.id, 'director_name': director_name})
+        db_session.commit()
+        db_session.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        db_session.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Add to watchlist
+@app.route('/api/watchlist', methods=['POST'])
+@login_required
+def add_to_watchlist():
+    data = request.get_json()
+    screening_id = data.get('screening_id')
+    notes = data.get('notes', '')
+    db_session = SessionLocal()
+    try:
+        db_session.execute(text("""
+            INSERT OR IGNORE INTO watchlist (user_id, screening_id, notes)
+            VALUES (:user_id, :screening_id, :notes)
+        """), {'user_id': current_user.id, 'screening_id': screening_id, 'notes': notes})
+        db_session.commit()
+        db_session.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        db_session.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Remove from watchlist
+@app.route('/api/watchlist/<int:screening_id>', methods=['DELETE'])
+@login_required
+def remove_from_watchlist(screening_id):
+    db_session = SessionLocal()
+    try:
+        db_session.execute(text("""
+            DELETE FROM watchlist
+            WHERE user_id = :user_id AND screening_id = :screening_id
+        """), {'user_id': current_user.id, 'screening_id': screening_id})
+        db_session.commit()
+        db_session.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        db_session.close()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/directors/list')
+def get_directors_list():
+    """Get all unique directors"""
+    db_session = SessionLocal()
+    
+    try:
+        directors = db_session.execute(text("""
+            SELECT DISTINCT director
+            FROM movies
+            WHERE director IS NOT NULL 
+            AND director != ''
+            AND director != 'TV Series'
+            AND director NOT LIKE 'TV:%'
+            ORDER BY director
+        """)).fetchall()
+        
+        directors_list = [d.director for d in directors]
+        
+        db_session.close()
+        return jsonify({'directors': directors_list})
+        
+    except Exception as e:
+        db_session.close()
+        return jsonify({'error': str(e)}), 500
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

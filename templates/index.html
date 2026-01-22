@@ -105,13 +105,21 @@
                         </div>
                         {% endif %}
                     </div>
-                    <div>
-                        {% if screening.ticket_url %}
-                        <a href="{{ screening.ticket_url }}" target="_blank" class="ticket-link">
-                            Get Tickets →
-                        </a>
-                        {% endif %}
-                    </div>
+                <div class="screening-actions">
+                    {% if screening.ticket_url %}
+                    <a href="{{ screening.ticket_url }}" target="_blank" class="ticket-link">
+                        Get Tickets →
+                    </a>
+                    {% endif %}
+                    
+                    {% if current_user is defined and current_user.is_authenticated %}
+                    <button onclick="addToWatchlist({{ screening.id }}, event)" 
+                            class="btn-watchlist" 
+                            title="Add to watchlist">
+                        ⭐ Save
+                    </button>
+                    {% endif %}
+                </div>
                 </div>
             </div>
             {% endfor %}
@@ -128,9 +136,42 @@
 
 {% block extra_js %}
 <script>
+const isAuthenticated = {{ 'true' if current_user is defined and current_user.is_authenticated else 'false' }};
+
 function handleSearch(event) {
     if (event.key === 'Enter') {
         filterScreenings();
+    }
+}
+// Add to watchlist
+async function addToWatchlist(screeningId, event) {
+    event.stopPropagation(); // Prevent card click
+    
+    const response = await fetch('/api/watchlist', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({screening_id: screeningId})
+    });
+    
+    if (response.ok) {
+        const button = event.target;
+        button.textContent = '✅ Saved';
+        button.disabled = true;
+        button.style.background = '#4CAF50';
+        
+        // Reset after 2 seconds
+        setTimeout(() => {
+            button.textContent = '⭐ Save';
+            button.disabled = false;
+            button.style.background = '';
+        }, 2000);
+    } else {
+        const data = await response.json();
+        if (data.error && data.error.includes('UNIQUE constraint')) {
+            alert('Already in your watchlist!');
+        } else {
+            alert('Error adding to watchlist');
+        }
     }
 }
 
@@ -260,10 +301,18 @@ function displayScreenings(screenings) {
             ? `<div style="color: #666; margin-top: 5px;">ℹ️ ${screening.special_notes}</div>` 
             : '';
         
+        const watchlistButton = isAuthenticated 
+            ? `<button onclick="addToWatchlist(${screening.id}, event)" 
+                    class="btn-watchlist" 
+                    title="Add to watchlist">
+                ⭐ Save
+            </button>`
+            : '';
+
         const ticketLink = screening.ticket_url 
             ? `<a href="${screening.ticket_url}" target="_blank" class="ticket-link">Get Tickets →</a>` 
             : '';
-        
+
         html += `
             <div class="screening-card">
                 ${posterHtml}
@@ -282,8 +331,9 @@ function displayScreenings(screenings) {
                         </div>
                         ${notes}
                     </div>
-                    <div>
+                    <div class="screening-actions">
                         ${ticketLink}
+                        ${watchlistButton}
                     </div>
                 </div>
             </div>

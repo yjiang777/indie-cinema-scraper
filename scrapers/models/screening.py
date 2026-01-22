@@ -1,6 +1,7 @@
 """Screening model"""
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
+from datetime import datetime
 from .base import Base
 
 
@@ -14,6 +15,7 @@ class Screening(Base):
     screening_datetime = Column(DateTime, nullable=False, index=True)
     ticket_url = Column(String)
     special_notes = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
     
     # Relationships
     movie = relationship("Movie", back_populates="screenings")
@@ -21,10 +23,11 @@ class Screening(Base):
     
     # Unique constraint: same movie at same theater at same time
     __table_args__ = (
-        UniqueConstraint('movie_id', 'theater_id', 'screening_datetime', 
+        UniqueConstraint('movie_id', 'theater_id', 'screening_datetime',
                         name='uq_screening'),
         Index('idx_screening_datetime', 'screening_datetime'),
         Index('idx_theater_id', 'theater_id'),
+        Index('idx_created_at', 'created_at'),
     )
     
     def __repr__(self):

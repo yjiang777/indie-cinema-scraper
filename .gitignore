@@ -1,3 +1,6 @@
+# Runtime data
+data/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -147,3 +150,5 @@ venv/
 
 # OS files
 .DS_Store
+# Never commit secrets
+.env

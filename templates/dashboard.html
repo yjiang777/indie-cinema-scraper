@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - LA Indie Cinema{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <h1>Welcome, {{ current_user.name }}! 🎬</h1>
+    
+    <!-- Favorite Theaters Section -->
+    <div class="dashboard-section">
+        <div class="section-header">
+            <h2>⭐ Favorite Theaters</h2>
+            <button onclick="showAddTheaterModal()" class="btn-add">+ Add Theater</button>
+        </div>
+        
+        {% if favorite_theaters %}
+            <div class="favorites-grid">
+                {% for theater in favorite_theaters %}
+                <div class="favorite-card">
+                    <div>
+                        <h3>{{ theater.name }}</h3>
+                        <p>{{ theater.city }}</p>
+                    </div>
+                    <button onclick="removeFavoriteTheater({{ theater.id }})" class="btn-remove">Remove</button>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty-state">No favorite theaters yet. Add some to get personalized recommendations!</p>
+        {% endif %}
+    </div>
+    
+    <!-- Favorite Directors Section -->
+    <div class="dashboard-section">
+        <div class="section-header">
+            <h2>🎬 Favorite Directors</h2>
+            <button onclick="showAddDirectorModal()" class="btn-add">+ Add Director</button>
+        </div>
+        
+        {% if favorite_directors %}
+            <div class="favorites-grid">
+                {% for director in favorite_directors %}
+                <div class="favorite-card">
+                    <div>
+                        <h3>{{ director.director_name }}</h3>
+                    </div>
+                    <button onclick="removeFavoriteDirector('{{ director.director_name }}')" class="btn-remove">Remove</button>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty-state">No favorite directors yet. Add directors like Kubrick to get notified of their screenings!</p>
+        {% endif %}
+    </div>
+    
+    <!-- Watchlist Section -->
+    <div class="dashboard-section">
+        <div class="section-header">
+            <h2>📋 My Watchlist</h2>
+        </div>
+        
+        {% if watchlist %}
+            <div class="watchlist-grid">
+                {% for item in watchlist %}
+                <div class="watchlist-card">
+                    <div class="watchlist-info">
+                        <h3>{{ item.title }}</h3>
+                        {% if item.director %}
+                        <p class="director">Directed by {{ item.director }}</p>
+                        {% endif %}
+                        <p class="screening-details">
+                            📍 {{ item['theater_name'] }}<br>
+                            📅 {{ item['screening_datetime'].strftime('%a, %b %d at %I:%M %p') }}
+                        </p>
+                    </div>
+                    <button onclick="removeFromWatchlist({{ item['screening_id'] }})" class="btn-remove">Remove</button>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty-state">Your watchlist is empty. Browse screenings and add ones you want to see!</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Theater Modal -->
+<div id="addTheaterModal" class="modal">
+    <div class="modal-content">
+        <h2>Add Favorite Theater</h2>
+        <select id="theaterSelect" class="form-control">
+            <option value="">Select a theater...</option>
+            {% for theater in all_theaters %}
+            <option value="{{ theater.id }}">{{ theater.name }}</option>
+            {% endfor %}
+        </select>
+        <div class="modal-buttons">
+            <button onclick="addFavoriteTheater()" class="btn-primary">Add</button>
+            <button onclick="closeModal('addTheaterModal')" class="btn-secondary">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Director Modal -->
+<div id="addDirectorModal" class="modal">
+    <div class="modal-content">
+        <h2>Add Favorite Director</h2>
+        <input type="text" 
+               id="directorInput" 
+               placeholder="Start typing director name..." 
+               class="form-control"
+               autocomplete="off"
+               oninput="searchDirectors(this.value)">
+        <div id="directorSuggestions" class="suggestions-dropdown"></div>
+        <div class="modal-buttons">
+            <button onclick="addFavoriteDirector()" class="btn-primary">Add</button>
+            <button onclick="closeModal('addDirectorModal')" class="btn-secondary">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Show modals
+function showAddTheaterModal() {
+    document.getElementById('addTheaterModal').style.display = 'flex';
+}
+
+function showAddDirectorModal() {
+    document.getElementById('addDirectorModal').style.display = 'flex';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+// Add favorite theater
+async function addFavoriteTheater() {
+    const theaterId = document.getElementById('theaterSelect').value;
+    if (!theaterId) {
+        alert('Please select a theater');
+        return;
+    }
+    
+    const response = await fetch('/api/favorites/theater', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({theater_id: theaterId})
+    });
+    
+    if (response.ok) {
+        location.reload();
+    } else {
+        alert('Error adding theater');
+    }
+}
+
+// Remove favorite theater
+async function removeFavoriteTheater(theaterId) {
+    if (!confirm('Remove this theater from favorites?')) return;
+    
+    const response = await fetch(`/api/favorites/theater/${theaterId}`, {
+        method: 'DELETE'
+    });
+    
+    if (response.ok) {
+        location.reload();
+    }
+}
+
+// Add favorite director
+// Search directors for autocomplete
+let allDirectors = [];
+
+async function searchDirectors(query) {
+    if (!query || query.length < 2) {
+        document.getElementById('directorSuggestions').innerHTML = '';
+        return;
+    }
+    
+    // Load directors if not already loaded
+    if (allDirectors.length === 0) {
+        const response = await fetch('/api/directors/list');
+        const data = await response.json();
+        allDirectors = data.directors || [];
+    }
+    
+    // Filter directors
+    const filtered = allDirectors.filter(d => 
+        d.toLowerCase().includes(query.toLowerCase())
+    ).slice(0, 10);
+    
+    // Show suggestions
+    const html = filtered.map(d => 
+        `<div class="suggestion-item" onclick="selectDirector('${d.replace(/'/g, "\\'")}')">${d}</div>`
+    ).join('');
+    
+    document.getElementById('directorSuggestions').innerHTML = html;
+}
+
+function selectDirector(director) {
+    document.getElementById('directorInput').value = director;
+    document.getElementById('directorSuggestions').innerHTML = '';
+}
+
+// Update addFavoriteDirector to close suggestions
+async function addFavoriteDirector() {
+    const director = document.getElementById('directorInput').value.trim();
+    if (!director) {
+        alert('Please enter a director name');
+        return;
+    }
+    
+    const response = await fetch('/api/favorites/director', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({director_name: director})
+    });
+    
+    if (response.ok) {
+        document.getElementById('directorSuggestions').innerHTML = '';
+        location.reload();
+    } else {
+        alert('Error adding director');
+    }
+}
+
+// Remove favorite director
+async function removeFavoriteDirector(director) {
+    if (!confirm(`Remove ${director} from favorites?`)) return;
+    
+    const response = await fetch(`/api/favorites/director/${encodeURIComponent(director)}`, {
+        method: 'DELETE'
+    });
+    
+    if (response.ok) {
+        location.reload();
+    }
+}
+
+// Remove from watchlist
+async function removeFromWatchlist(screeningId) {
+    if (!confirm('Remove from watchlist?')) return;
+    
+    const response = await fetch(`/api/watchlist/${screeningId}`, {
+        method: 'DELETE'
+    });
+    
+    if (response.ok) {
+        location.reload();
+    }
+}
+</script>
+{% endblock %}

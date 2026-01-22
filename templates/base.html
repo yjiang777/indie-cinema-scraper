@@ -6,6 +6,185 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}LA Indie Cinema Finder{% endblock %}</title>
     <style>
+        
+        /* Screening card buttons container */
+        .screening-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: stretch;
+            min-width: 140px;
+        }
+
+        /* Ticket link */
+        .ticket-link {
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95em;
+            /* Same font size */
+            transition: all 0.2s;
+            white-space: nowrap;
+            text-align: center;
+            display: block;
+        }
+
+        .ticket-link:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Watchlist button */
+        .btn-watchlist {
+            padding: 12px 20px;
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95em;
+            /* Same font size */
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-watchlist:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-watchlist:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+
+        /* Autocomplete suggestions */
+        .suggestions-dropdown {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: -15px;
+            margin-bottom: 15px;
+            background: white;
+        }
+
+        .suggestion-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .suggestion-item:hover {
+            background: #f5f5f5;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Auth Pages */
+        .auth-container {
+            min-height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .auth-box {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .auth-box h1 {
+            margin-bottom: 30px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .auth-link {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        .auth-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .alert-error {
+            background: #fee;
+            color: #c33;
+            border: 1px solid #fcc;
+        }
+
+        .alert-success {
+            background: #efe;
+            color: #3c3;
+            border: 1px solid #cfc;
+        }
+
         .screening-poster-placeholder {
             width: 120px;
             height: 180px;
@@ -19,22 +198,6 @@
             color: white;
         }
 
-        .screening-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
-            display: flex;
-            gap: 20px;
-        }
-
-        .screening-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-        }
-
         .screening-poster {
             width: 120px;
             height: 180px;
@@ -42,52 +205,6 @@
             border-radius: 8px;
             flex-shrink: 0;
         }
-
-        .screening-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            flex: 1;
-            gap: 20px;
-        }
-
-        .movie-title {
-            font-size: 1.3em;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 8px;
-        }
-
-        .screening-info {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            margin-top: 10px;
-            color: #666;
-            font-size: 0.9em;
-        }
-
-        .theater-name {
-            font-weight: 600;
-            color: #667eea;
-        }
-
-        .ticket-link {
-            padding: 10px 20px;
-            background: #667eea;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: 600;
-            transition: background 0.2s;
-            white-space: nowrap;
-        }
-
-        .ticket-link:hover {
-            background: #5568d3;
-        }
-
-
 
         .nav-tabs {
             display: flex;
@@ -135,22 +252,82 @@
             padding: 20px;
         }
 
+        /* Header */
         header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 30px 0;
-            margin-bottom: 30px;
+            padding: 0;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
-        header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        header p {
-            font-size: 1.1em;
+        .header-content h1 {
+            margin: 0;
+            font-size: 1.8em;
+        }
+
+        .header-content h1 a {
+            color: white;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+
+        .header-content h1 a:hover {
             opacity: 0.9;
+        }
+
+        .header-content nav {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .header-content nav a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .header-content nav a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* Make Login/Signup stand out */
+        .header-content nav a[href="/login"],
+        .header-content nav a[href="/signup"] {
+            background: rgba(255, 255, 255, 0.9);
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .header-content nav a[href="/login"]:hover,
+        .header-content nav a[href="/signup"]:hover {
+            background: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Dashboard and Logout styling */
+        .header-content nav a[href="/dashboard"] {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .header-content nav a[href="/logout"] {
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .search-box {
@@ -213,25 +390,28 @@
             border-radius: 10px;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
             transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            gap: 20px;
         }
 
         .screening-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
         }
 
         .screening-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 10px;
+            flex: 1;
+            gap: 20px;
         }
 
         .movie-title {
-            font-size: 1.5em;
+            font-size: 1.3em;
             font-weight: bold;
             color: #333;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
 
         .format-badge {
@@ -251,9 +431,11 @@
 
         .screening-info {
             display: flex;
-            gap: 20px;
-            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
             color: #666;
+            font-size: 0.9em;
         }
 
         .screening-info span {
@@ -268,18 +450,23 @@
         }
 
         .ticket-link {
-            display: inline-block;
-            padding: 8px 20px;
-            background: #10b981;
+            padding: 12px 20px;
+            background: #667eea;
             color: white;
             text-decoration: none;
-            border-radius: 5px;
+            border-radius: 8px;
             font-weight: 600;
-            transition: background 0.2s;
+            font-size: 0.95em;
+            transition: all 0.2s;
+            white-space: nowrap;
+            text-align: center;
+            display: block;
         }
 
         .ticket-link:hover {
-            background: #059669;
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
         }
 
         .stats {
@@ -322,18 +509,258 @@
             color: #667eea;
             font-size: 1.2em;
         }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+                padding: 15px 20px;
+            }
+
+            .header-content nav {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 8px;
+            }
+
+            .header-content nav a {
+                padding: 8px 15px;
+                font-size: 0.9em;
+            }
+        }
+
+        /* Dashboard */
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .dashboard-container h1 {
+            margin-bottom: 40px;
+            color: #333;
+        }
+
+        .dashboard-section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .section-header h2 {
+            margin: 0;
+            color: #333;
+        }
+
+        .btn-add {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn-add:hover {
+            background: #5568d3;
+        }
+
+        .btn-remove {
+            padding: 8px 16px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .btn-remove:hover {
+            background: #d32f2f;
+        }
+
+        .btn-secondary {
+            padding: 10px 20px;
+            background: #ddd;
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: #ccc;
+        }
+
+        .favorites-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .favorite-card {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .favorite-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .favorite-card h3 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+
+        .favorite-card p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .watchlist-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .watchlist-card {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .watchlist-info h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+
+        .watchlist-info .director {
+            color: #667eea;
+            margin: 5px 0;
+            font-weight: 500;
+        }
+
+        .watchlist-info .screening-details {
+            color: #666;
+            margin: 10px 0 0 0;
+            line-height: 1.6;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+            font-style: italic;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .favorites-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .favorite-card,
+            .watchlist-card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            .section-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 
 <body>
     <header>
-        <div class="container">
-            <h1>🎬 LA Indie Cinema Finder</h1>
-            <p>Discover repertory screenings, special formats, and indie films across Los Angeles</p>
+        <div class="header-content">
+            <h1><a href="/" style="color: white; text-decoration: none;">🎬 LA Indie Cinema</a></h1>
+            <nav>
+                <a href="/">Home</a>
+                <a href="/map">Map</a>
+                <a href="#" onclick="showDirectors(); return false;">Directors</a>
+                {% if current_user is defined and current_user.is_authenticated %}
+                <a href="/dashboard">Dashboard</a>
+                <a href="/logout">Logout</a>
+                {% else %}
+                <a href="/login">Login</a>
+                <a href="/signup">Sign Up</a>
+                {% endif %}
+            </nav>
         </div>
     </header>
-
     <div class="container">
         {% block content %}{% endblock %}
     </div>
