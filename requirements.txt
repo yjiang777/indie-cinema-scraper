@@ -13,9 +13,6 @@ sqlalchemy==2.0.23
 # Environment & Configuration
 python-dotenv==1.0.0
 
-# Data validation (optional, for future use)
-pydantic==2.5.0
-
 # Browser automation (for future American Cinematheque/Landmark)
 # playwright==1.40.0  # Commented out - Apple Silicon issues, install when needed
 
