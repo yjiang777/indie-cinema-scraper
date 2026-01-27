@@ -8,6 +8,9 @@ from collections import defaultdict
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from dotenv import load_dotenv
+load_dotenv(project_root / '.env', override=True)
+
 from sqlalchemy import text
 from scrapers.models.base import SessionLocal, init_db
 from scrapers.models.screening import Screening
