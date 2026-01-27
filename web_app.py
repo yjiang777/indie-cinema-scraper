@@ -5,6 +5,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import os
 from datetime import datetime, timedelta
 import pytz
+from dotenv import load_dotenv
+
+# Load environment variables from .env file (for local development)
+load_dotenv(override=True)
 
 from scrapers.models.base import SessionLocal, init_db
 from scrapers.models.theater import Theater
@@ -23,15 +27,18 @@ app.secret_key = os.environ.get('SECRET_KEY')
 if not app.secret_key:
     raise ValueError("SECRET_KEY environment variable not set")
 
-# Development configs to prevent 403 issues
-if app.debug:
-    app.config['SESSION_COOKIE_SAMESITE'] = None
-    app.config['SESSION_COOKIE_SECURE'] = False
-    
 # Session settings
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
-app.config['SESSION_COOKIE_NAME'] = 'indie_cinema_dev'  # Unique name
+app.config['SESSION_COOKIE_NAME'] = 'indie_cinema_session'
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+
+# Production vs development cookie settings
+if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('PRODUCTION'):
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+else:
+    app.config['SESSION_COOKIE_SAMESITE'] = None
+    app.config['SESSION_COOKIE_SECURE'] = False
 
 
 # THEN initialize Flask-Login and attach to app
@@ -493,8 +500,9 @@ def add_favorite_theater():
     db_session = SessionLocal()
     try:
         db_session.execute(text("""
-            INSERT OR IGNORE INTO favorite_theaters (user_id, theater_id)
+            INSERT INTO favorite_theaters (user_id, theater_id)
             VALUES (:user_id, :theater_id)
+            ON CONFLICT DO NOTHING
         """), {'user_id': current_user.id, 'theater_id': theater_id})
         db_session.commit()
         db_session.close()
@@ -529,8 +537,9 @@ def add_favorite_director():
     db_session = SessionLocal()
     try:
         db_session.execute(text("""
-            INSERT OR IGNORE INTO favorite_directors (user_id, director_name)
+            INSERT INTO favorite_directors (user_id, director_name)
             VALUES (:user_id, :director_name)
+            ON CONFLICT DO NOTHING
         """), {'user_id': current_user.id, 'director_name': director_name})
         db_session.commit()
         db_session.close()
@@ -566,8 +575,9 @@ def add_to_watchlist():
     db_session = SessionLocal()
     try:
         db_session.execute(text("""
-            INSERT OR IGNORE INTO watchlist (user_id, screening_id, notes)
+            INSERT INTO watchlist (user_id, screening_id, notes)
             VALUES (:user_id, :screening_id, :notes)
+            ON CONFLICT DO NOTHING
         """), {'user_id': current_user.id, 'screening_id': screening_id, 'notes': notes})
         db_session.commit()
         db_session.close()
@@ -619,4 +629,6 @@ def get_directors_list():
         db_session.close()
         return jsonify({'error': str(e)}), 500
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_DEBUG', 'true').lower() == 'true'
+    app.run(debug=debug, host='0.0.0.0', port=port)
