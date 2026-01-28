@@ -365,8 +365,13 @@ def scrape_regal(session):
     print("\n" + "="*60)
     print("🎬 REGAL THEATRES SCRAPER")
     print("="*60)
-    
-    from scrapers.regal.scraper import RegalScraper
+
+    try:
+        from scrapers.regal.scraper import RegalScraper
+    except ImportError:
+        print("⏭️  Skipping - Playwright not installed")
+        return
+
     from scrapers.regal.theaters import REGAL_THEATERS
     
     total_new_screenings = 0
