@@ -5,6 +5,8 @@ from pathlib import Path
 from datetime import datetime
 import pytz
 
+pacific_tz = pytz.timezone('America/Los_Angeles')
+
 from scrapers.models.base import engine, SessionLocal, init_db
 from scrapers.models.theater import Theater
 from scrapers.models.movie import Movie
