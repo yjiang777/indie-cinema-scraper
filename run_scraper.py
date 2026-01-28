@@ -23,24 +23,31 @@ def ensure_database_exists():
     db_dir.mkdir(exist_ok=True)
 
 
-def get_or_create_theater(session, name, address, city, state, website):
+def get_or_create_theater(session, name, address, city, state, website, latitude=None, longitude=None):
     """Get existing theater or create new one"""
     theater = session.query(Theater).filter_by(name=name).first()
-    
+
     if not theater:
         theater = Theater(
             name=name,
             address=address,
             city=city,
             state=state,
-            website=website
+            website=website,
+            latitude=latitude,
+            longitude=longitude
         )
         session.add(theater)
         session.commit()
         print(f"✅ Created theater: {name}")
     else:
+        # Update coordinates if provided and not already set
+        if latitude and longitude and (not theater.latitude or not theater.longitude):
+            theater.latitude = latitude
+            theater.longitude = longitude
+            session.commit()
         print(f"♻️  Using existing theater: {name}")
-    
+
     return theater
 
 
@@ -428,19 +435,59 @@ def scrape_regal(session):
     print(f"✅ Regal: {total_new_screenings} new screenings")
     print(f"{'='*60}")
 
+def scrape_fine_arts(session):
+    """Scrape Fine Arts Theatre Beverly Hills"""
+    print("\n" + "="*60)
+    print("🎬 FINE ARTS THEATRE BEVERLY HILLS SCRAPER")
+    print("="*60)
+
+    from scrapers.fine_arts.scraper import FineArtsScraper
+
+    scraper = FineArtsScraper()
+    theater_info = scraper.get_theater_info()
+
+    # Get or create theater with coordinates for map
+    theater = get_or_create_theater(
+        session,
+        name=theater_info['name'],
+        address=theater_info['address'],
+        city=theater_info['city'],
+        state=theater_info['state'],
+        website=theater_info['website'],
+        latitude=theater_info['latitude'],
+        longitude=theater_info['longitude']
+    )
+
+    screenings = scraper.scrape_schedule()
+    new_count = 0
+
+    for screening_data in screenings:
+        movie = get_or_create_movie(
+            session,
+            title=screening_data['title'],
+            movie_format=screening_data.get('format')
+        )
+
+        if save_screening(session, movie, theater, screening_data):
+            new_count += 1
+
+    print(f"\n✅ Added {new_count} new screenings from Fine Arts Theatre")
+
+
 def main():
     """Main scraper execution"""
     ensure_database_exists()
     init_db()
-    
+
     session = SessionLocal()
-    
+
     try:
         scrape_new_beverly(session)
         scrape_laemmle(session)
         scrape_american_cinematheque(session)
         scrape_landmark(session)
         scrape_usc_cinema(session)
+        scrape_fine_arts(session)
 
         # Playwright-based scrapers (may fail due to timeouts/blocking)
         try:
@@ -448,7 +495,7 @@ def main():
         except Exception as e:
             print(f"\n⚠️  Regal scraper failed: {e}")
             print("Continuing with other scrapers...")
-        
+
         show_summary(session)
         
     finally:
