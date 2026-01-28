@@ -63,30 +63,47 @@ def inject_user():
 pacific_tz = pytz.timezone('America/Los_Angeles')
 
 
+def format_screening_time(dt):
+    """Format a screening datetime, treating naive datetimes as Pacific time"""
+    if dt.tzinfo is None:
+        # Naive datetime - treat as Pacific time
+        dt = pacific_tz.localize(dt)
+    else:
+        # Convert to Pacific if it has timezone
+        dt = dt.astimezone(pacific_tz)
+    return dt
+
+
+def get_now_naive():
+    """Get current time as naive datetime in Pacific timezone (for DB comparisons)"""
+    return datetime.now(pacific_tz).replace(tzinfo=None)
+
+
 @app.route('/')
 def index():
     """Homepage showing upcoming screenings"""
     session = SessionLocal()
     
     try:
-        now = datetime.now(pacific_tz)
+        now = get_now_naive()
 
         # Get theaters for filter dropdown
         theaters = session.query(Theater).order_by(Theater.name).all()
-        
+
         # Get upcoming screenings (next 7 days by default)
         end_date = now + timedelta(days=7)
-        
+
         screenings = session.query(Screening).join(Movie).join(Theater)\
             .filter(Screening.screening_datetime >= now)\
             .filter(Screening.screening_datetime <= end_date)\
             .order_by(Screening.screening_datetime)\
             .limit(50)\
             .all()
-        
+
         # Format for template
         formatted_screenings = []
         for screening in screenings:
+            screen_time = format_screening_time(screening.screening_datetime)
             formatted_screenings.append({
                 'id': screening.id,
                 'movie_title': screening.movie.title,
@@ -94,8 +111,8 @@ def index():
                 'theater_name': screening.theater.name,
                 'theater_city': screening.theater.city,
                 'datetime': screening.screening_datetime,
-                'formatted_date': screening.screening_datetime.strftime('%a, %b %d'),
-                'formatted_time': screening.screening_datetime.strftime('%I:%M %p'),
+                'formatted_date': screen_time.strftime('%a, %b %d'),
+                'formatted_time': screen_time.strftime('%I:%M %p'),
                 'format': screening.movie.format or 'Digital',
                 'poster_url': screening.movie.poster_url,
                 'runtime': screening.movie.runtime,
@@ -128,7 +145,7 @@ def search():
         date_filter = request.args.get('date', 'week')  # today, week, month
         format_filter = request.args.get('format', '')
         
-        now = datetime.now(pacific_tz)
+        now = get_now_naive()
 
         # Build query
         screenings_query = session.query(Screening).join(Movie).join(Theater)\
@@ -170,6 +187,7 @@ def search():
         
         formatted_screenings = []
         for screening in screenings:
+            screen_time = format_screening_time(screening.screening_datetime)
             formatted_screenings.append({
                 'id': screening.id,
                 'movie_title': screening.movie.title,
@@ -177,15 +195,15 @@ def search():
                 'theater_name': screening.theater.name,
                 'theater_city': screening.theater.city,
                 'datetime': screening.screening_datetime.isoformat(),
-                'formatted_date': screening.screening_datetime.strftime('%a, %b %d'),
-                'formatted_time': screening.screening_datetime.strftime('%I:%M %p'),
+                'formatted_date': screen_time.strftime('%a, %b %d'),
+                'formatted_time': screen_time.strftime('%I:%M %p'),
                 'format': screening.movie.format or 'Digital',
                 'poster_url': screening.movie.poster_url,
                 'runtime': screening.movie.runtime,
                 'ticket_url': screening.ticket_url,
                 'special_notes': screening.special_notes
             })
-        
+
         return jsonify({
             'success': True,
             'count': len(formatted_screenings),
@@ -208,7 +226,7 @@ def directors():
     session = SessionLocal()
     
     try:
-        now = datetime.now(pacific_tz)
+        now = get_now_naive()
 
         # Get unique directors with screening counts
         directors_query = session.query(
@@ -244,7 +262,7 @@ def stats():
     session = SessionLocal()
     
     try:
-        now = datetime.now(pacific_tz)
+        now = get_now_naive()
 
         theater_count = session.query(Theater).count()
         movie_count = session.query(Movie).count()
@@ -319,7 +337,7 @@ def api_theater_screenings(theater_id):
     session = SessionLocal()
     
     try:
-        now = datetime.now(pacific_tz)
+        now = get_now_naive()
 
         screenings = session.query(Screening).join(Movie).join(Theater)\
             .filter(Theater.id == theater_id)\
@@ -330,17 +348,18 @@ def api_theater_screenings(theater_id):
         
         formatted_screenings = []
         for screening in screenings:
+            screen_time = format_screening_time(screening.screening_datetime)
             formatted_screenings.append({
                 'id': screening.id,
                 'movie_title': screening.movie.title,
                 'director': screening.movie.director,
-                'formatted_date': screening.screening_datetime.strftime('%a, %b %d'),
-                'formatted_time': screening.screening_datetime.strftime('%I:%M %p'),
+                'formatted_date': screen_time.strftime('%a, %b %d'),
+                'formatted_time': screen_time.strftime('%I:%M %p'),
                 'format': screening.movie.format or 'Digital',
                 'poster_url': screening.movie.poster_url,
                 'ticket_url': screening.ticket_url
             })
-        
+
         return jsonify({
             'success': True,
             'screenings': formatted_screenings
