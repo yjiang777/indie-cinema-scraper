@@ -142,43 +142,57 @@ def search():
         # Get query parameters
         query = request.args.get('q', '').strip()
         theater_id = request.args.get('theater', '')
-        date_filter = request.args.get('date', 'week')  # today, week, month
+        date_filter = request.args.get('date', 'week')  # today, week, month, custom
         format_filter = request.args.get('format', '')
-        
+        start_date_str = request.args.get('start_date', '')
+        end_date_str = request.args.get('end_date', '')
+
         now = get_now_naive()
 
         # Build query
-        screenings_query = session.query(Screening).join(Movie).join(Theater)\
-            .filter(Screening.screening_datetime >= now)
-        
+        screenings_query = session.query(Screening).join(Movie).join(Theater)
+
         # Apply filters
         if query:
             screenings_query = screenings_query.filter(
                 (Movie.title.ilike(f'%{query}%')) |
                 (Movie.director.ilike(f'%{query}%'))
             )
-        
+
         if theater_id:
             screenings_query = screenings_query.filter(
                 Theater.id == int(theater_id)
             )
-        
+
         if format_filter:
             screenings_query = screenings_query.filter(
                 Movie.format == format_filter
             )
-        
+
         # Date filter
-        if date_filter == 'today':
+        if date_filter == 'custom' and start_date_str and end_date_str:
+            # Custom date range
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+            except ValueError:
+                start_date = now
+                end_date = now + timedelta(days=7)
+        elif date_filter == 'today':
+            start_date = now
             end_date = now.replace(hour=23, minute=59, second=59)
         elif date_filter == 'week':
+            start_date = now
             end_date = now + timedelta(days=7)
         elif date_filter == 'month':
+            start_date = now
             end_date = now + timedelta(days=30)
         else:
+            start_date = now
             end_date = now + timedelta(days=365)
-        
+
         screenings_query = screenings_query.filter(
+            Screening.screening_datetime >= start_date,
             Screening.screening_datetime <= end_date
         )
         
