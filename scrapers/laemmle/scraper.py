@@ -119,7 +119,7 @@ class LaemmleScraper:
         
         return screenings
     
-    def scrape_multiple_dates(self, num_days: int = 7) -> List[Dict]:
+    def scrape_multiple_dates(self, num_days: int = 14) -> List[Dict]:
         """
         Scrape showtimes for the next N days
         

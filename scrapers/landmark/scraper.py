@@ -98,7 +98,7 @@ class LandmarkAPI:
         
         return screenings
     
-    def scrape_next_days(self, num_days: int = 7) -> List[Dict]:
+    def scrape_next_days(self, num_days: int = 14) -> List[Dict]:
         """
         Scrape the next N days
         

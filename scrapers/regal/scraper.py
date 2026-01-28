@@ -3,7 +3,7 @@ from scrapers.base.playwright_scraper import PlaywrightScraper
 from bs4 import BeautifulSoup
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from typing import List, Dict, Optional
 
@@ -16,56 +16,74 @@ class RegalScraper:
         self.theater_code = theater_code
         self.timezone = pytz.timezone(timezone)
     
-    def scrape_schedule(self, days_ahead: int = 7) -> List[Dict]:
-        """Scrape showtimes from Regal theater page"""
-        screenings = []
-        
+    def scrape_schedule(self, days_ahead: int = 14) -> List[Dict]:
+        """Scrape showtimes from Regal theater page for multiple days"""
+        all_screenings = []
+        today = datetime.now(self.timezone).date()
+
         with PlaywrightScraper(headless=True) as scraper:
-            print(f"   Loading page: {self.theater_url}")
-            
-            # Just load the base page - it has multiple days already
-            scraper.navigate_and_wait(self.theater_url)
+            for i in range(days_ahead):
+                date = today + timedelta(days=i)
+                date_str = date.strftime('%m-%d-%Y')  # Regal uses MM-DD-YYYY format
+
+                screenings = self._scrape_date(scraper, date_str)
+                all_screenings.extend(screenings)
+
+                # Small delay between requests to avoid rate limiting
+                if i < days_ahead - 1:
+                    time.sleep(1)
+
+        print(f"   Extracted {len(all_screenings)} total screenings")
+        return all_screenings
+
+    def _scrape_date(self, scraper: PlaywrightScraper, date_str: str) -> List[Dict]:
+        """Scrape showtimes for a specific date"""
+        screenings = []
+        url = f"{self.theater_url}?date={date_str}"
+
+        print(f"   Loading {date_str}...", end='', flush=True)
+
+        try:
+            scraper.navigate_and_wait(url)
             html = scraper.get_page_content()
             soup = BeautifulSoup(html, 'html.parser')
-            
+
             # Extract Next.js data
             next_data = soup.find('script', id='__NEXT_DATA__')
-            
+
             if not next_data:
-                print("   ❌ Could not find __NEXT_DATA__")
+                print(" ❌ No data")
                 return []
-            
-            try:
-                data = json.loads(next_data.string)
-                
-                # The base page already has showtimes for multiple days
-                showtimes_data = data.get('props', {}).get('pageProps', {}).get('showtimes', [])
-                
-                if not showtimes_data:
-                    print("   ⚠️  No showtimes found")
-                    return []
-                
-                print(f"   Found {len(showtimes_data)} days of showtimes")
-                
-                # Parse each day (limit to days_ahead)
-                for day in showtimes_data[:days_ahead]:
-                    films = day.get('Film', [])
-                    
-                    for film in films:
-                        title = film.get('Title', '')
-                        performances = film.get('Performances', [])
-                        
-                        for performance in performances:
-                            screening = self._parse_performance(title, performance)
-                            if screening:
-                                screenings.append(screening)
-                
-                print(f"   Extracted {len(screenings)} screenings")
-                
-            except json.JSONDecodeError as e:
-                print(f"   ❌ Error parsing JSON: {e}")
+
+            data = json.loads(next_data.string)
+
+            # Get showtimes for this specific date
+            showtimes_data = data.get('props', {}).get('pageProps', {}).get('showtimes', [])
+
+            if not showtimes_data:
+                print(" 0 films")
                 return []
-        
+
+            # Usually the first day in the response is the requested date
+            day_data = showtimes_data[0] if showtimes_data else {}
+            films = day_data.get('Film', [])
+
+            for film in films:
+                title = film.get('Title', '')
+                performances = film.get('Performances', [])
+
+                for performance in performances:
+                    screening = self._parse_performance(title, performance)
+                    if screening:
+                        screenings.append(screening)
+
+            print(f" {len(screenings)} screenings")
+
+        except json.JSONDecodeError as e:
+            print(f" ❌ JSON error")
+        except Exception as e:
+            print(f" ❌ Error: {e}")
+
         return screenings
     
     def _parse_performance(self, title: str, performance: Dict) -> Optional[Dict]:
@@ -85,15 +103,11 @@ class RegalScraper:
             else:
                 dt_local = dt.astimezone(self.timezone)
             
-            # Keep shows from the next 24 hours OR shows that started within last 30 minutes
+            # Filter out shows that have already started (more than 30 min ago)
             now = datetime.now(self.timezone)
             time_diff = (dt_local - now).total_seconds() / 60  # minutes
-            
-            # Filter: keep if show is within [-30 min, +24 hours]
+
             if time_diff < -30:  # Started more than 30 min ago
-                return None
-            
-            if time_diff > 24 * 60:  # More than 24 hours away
                 return None
             
             # Extract format from attributes

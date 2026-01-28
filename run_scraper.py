@@ -208,7 +208,7 @@ def scrape_laemmle(session):
         print(f"\n[{i}/{len(LAEMMLE_THEATERS)}] {theater_info['name']}...", end='', flush=True)
         
         scraper = LaemmleScraper(theater_info['url'], theater_info['name'])
-        screenings = scraper.scrape_multiple_dates(num_days=3)  # Reduced to 3 days
+        screenings = scraper.scrape_multiple_dates(num_days=14)
         
         print(f" {len(screenings)} screenings", end='', flush=True)
         
@@ -312,7 +312,7 @@ def scrape_landmark(session):
         
         # Scrape schedule
         api = LandmarkAPI(theater_info['api_id'], theater_info['timezone'])
-        screenings = api.scrape_next_days(num_days=7)
+        screenings = api.scrape_next_days(num_days=14)
         
         print(f" {len(screenings)} screenings", end='', flush=True)
         
@@ -411,7 +411,7 @@ def scrape_regal(session):
             timezone=theater_info['timezone']
         )
         
-        screenings = scraper.scrape_schedule()
+        screenings = scraper.scrape_schedule(days_ahead=14)
         
         print(f" {len(screenings)} screenings", end='', flush=True)
         
