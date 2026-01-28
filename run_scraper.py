@@ -433,7 +433,13 @@ def main():
         scrape_american_cinematheque(session)
         scrape_landmark(session)
         scrape_usc_cinema(session)
-        scrape_regal(session)  # ← Add this line
+
+        # Playwright-based scrapers (may fail due to timeouts/blocking)
+        try:
+            scrape_regal(session)
+        except Exception as e:
+            print(f"\n⚠️  Regal scraper failed: {e}")
+            print("Continuing with other scrapers...")
         
         show_summary(session)
         

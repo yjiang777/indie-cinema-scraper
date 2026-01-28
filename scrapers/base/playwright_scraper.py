@@ -33,7 +33,7 @@ class PlaywrightScraper:
         if self.playwright:
             self.playwright.stop()
     
-    def navigate_and_wait(self, url: str, wait_for: Optional[str] = None, timeout: int = 30000, wait_until: str = 'networkidle'):
+    def navigate_and_wait(self, url: str, wait_for: Optional[str] = None, timeout: int = 60000, wait_until: str = 'domcontentloaded'):
         """
         Navigate to URL and wait for content to load
         
