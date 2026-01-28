@@ -61,21 +61,27 @@ def get_or_create_movie(session, title, runtime=None, movie_format=None):
 
 def save_screening(session, movie, theater, screening_data):
     """Save screening to database (skip duplicates)"""
+    # Get the datetime and convert to naive Pacific time for storage
+    dt = screening_data['datetime']
+    if dt.tzinfo is not None:
+        # Convert to Pacific then remove timezone info for storage
+        dt = dt.astimezone(pacific_tz).replace(tzinfo=None)
+
     # Check if screening already exists
     existing = session.query(Screening).filter_by(
         movie_id=movie.id,
         theater_id=theater.id,
-        screening_datetime=screening_data['datetime']
+        screening_datetime=dt
     ).first()
-    
+
     if existing:
         return False  # Already exists
-    
+
     # Create new screening
     screening = Screening(
         movie_id=movie.id,
         theater_id=theater.id,
-        screening_datetime=screening_data['datetime'],
+        screening_datetime=dt,
         ticket_url=screening_data.get('ticket_url'),
         special_notes=screening_data.get('special_notes')
     )
