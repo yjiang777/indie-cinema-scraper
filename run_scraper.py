@@ -187,7 +187,7 @@ def scrape_new_beverly(session):
 def scrape_laemmle(session):
     """Scrape all Laemmle Theatres"""
     print("\n" + "="*60)
-    print("🎬 LAEMMLE THEATRES SCRAPER (7 locations)")
+    print("🎬 LAEMMLE THEATRES SCRAPER (6 locations)")
     print("="*60)
     
     total_new_screenings = 0

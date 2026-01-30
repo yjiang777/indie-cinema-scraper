@@ -42,12 +42,5 @@ LAEMMLE_THEATERS = [
         "state": "CA",
         "url": "https://www.laemmle.com/theater/noho-7",
         "address": "5240 Lankershim Blvd, North Hollywood, CA 91601"
-    },
-    {
-        "name": "Laemmle Claremont 5",
-        "city": "Claremont",
-        "state": "CA",
-        "url": "https://www.laemmle.com/theater/claremont-5",
-        "address": "450 W 2nd St, Claremont, CA 91711"
     }
 ]

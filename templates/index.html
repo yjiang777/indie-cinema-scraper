@@ -1,5 +1,26 @@
 {% extends "base.html" %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+    #customDateRange {
+        display: none;
+    }
+    #dateRangePicker {
+        padding: 10px 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 5px;
+        font-size: 0.95em;
+        min-width: 220px;
+        cursor: pointer;
+    }
+    #dateRangePicker:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="nav-tabs">
     <a href="/" class="nav-tab active">🎬 Browse Screenings</a>
@@ -28,10 +49,8 @@
             <option value="custom">Custom Range</option>
         </select>
 
-        <div id="customDateRange" style="display: none;">
-            <input type="date" id="startDate" onchange="filterScreenings()">
-            <span style="color: #666;">to</span>
-            <input type="date" id="endDate" onchange="filterScreenings()">
+        <div id="customDateRange">
+            <input type="text" id="dateRangePicker" placeholder="Select dates...">
         </div>
 
         <select id="formatFilter" onchange="filterScreenings()">
@@ -142,8 +161,29 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
 const isAuthenticated = {{ 'true' if current_user is defined and current_user.is_authenticated else 'false' }};
+
+// Initialize flatpickr calendar
+let dateRangePicker;
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date();
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    dateRangePicker = flatpickr("#dateRangePicker", {
+        mode: "range",
+        dateFormat: "M j, Y",
+        defaultDate: [today, nextWeek],
+        minDate: "today",
+        onChange: function(selectedDates) {
+            if (selectedDates.length === 2) {
+                filterScreenings();
+            }
+        }
+    });
+});
 
 function handleSearch(event) {
     if (event.key === 'Enter') {
@@ -156,19 +196,7 @@ function handleDateFilterChange() {
     const customRange = document.getElementById('customDateRange');
 
     if (dateFilter === 'custom') {
-        customRange.style.display = 'flex';
-        // Set default dates if not set
-        const startDate = document.getElementById('startDate');
-        const endDate = document.getElementById('endDate');
-        if (!startDate.value) {
-            const today = new Date().toISOString().split('T')[0];
-            startDate.value = today;
-        }
-        if (!endDate.value) {
-            const nextWeek = new Date();
-            nextWeek.setDate(nextWeek.getDate() + 7);
-            endDate.value = nextWeek.toISOString().split('T')[0];
-        }
+        customRange.style.display = 'block';
     } else {
         customRange.style.display = 'none';
     }
@@ -222,11 +250,14 @@ async function filterScreenings() {
     if (format) params.append('format', format);
 
     // Add custom date range if selected
-    if (date === 'custom') {
-        const startDate = document.getElementById('startDate').value;
-        const endDate = document.getElementById('endDate').value;
-        if (startDate) params.append('start_date', startDate);
-        if (endDate) params.append('end_date', endDate);
+    if (date === 'custom' && dateRangePicker) {
+        const selectedDates = dateRangePicker.selectedDates;
+        if (selectedDates.length === 2) {
+            const startDate = selectedDates[0].toISOString().split('T')[0];
+            const endDate = selectedDates[1].toISOString().split('T')[0];
+            params.append('start_date', startDate);
+            params.append('end_date', endDate);
+        }
     }
     
     try {
