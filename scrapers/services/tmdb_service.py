@@ -17,20 +17,25 @@ class TMDBService:
     def search_movie(self, title: str, year: int = None) -> dict:
         """Search for a movie with improved title matching"""
         try:
+            # Extract year from title if present (e.g., "Movie (1993)")
+            clean_title, extracted_year = self._extract_year(title)
+            if extracted_year and not year:
+                year = extracted_year
+
             # Clean the title
-            clean_title = self._clean_title(title)
-            
+            clean_title = self._clean_title(clean_title)
+
             # Try exact search first
             result = self._try_search(clean_title, year)
             if result:
                 return result
-            
+
             # Try without year
             if year:
                 result = self._try_search(clean_title, None)
                 if result:
                     return result
-            
+
             # Try removing common suffixes
             for suffix in [' 3D', ' IMAX', ' 2D', ' 70MM', ' 35MM']:
                 if suffix.lower() in clean_title.lower():
@@ -38,16 +43,16 @@ class TMDBService:
                     result = self._try_search(cleaned, year)
                     if result:
                         return result
-            
+
             # Try removing anything in parentheses
             if '(' in clean_title:
                 base_title = clean_title.split('(')[0].strip()
                 result = self._try_search(base_title, year)
                 if result:
                     return result
-            
+
             return None
-            
+
         except Exception as e:
             print(f"Error searching TMDB: {e}")
             return None
@@ -55,27 +60,52 @@ class TMDBService:
     def _clean_title(self, title: str) -> str:
         """Clean up movie title for better matching"""
         cleaned = title.strip()
-        
-        # Remove language tags
+
+        # Handle double features - take the first movie
+        if ' / ' in cleaned:
+            cleaned = cleaned.split(' / ')[0].strip()
+
+        # Remove language tags like (Telugu), (Hindi), (Arabic)
         cleaned = re.sub(r'\s*\([A-Za-z]+\)\s*$', '', cleaned)
-        
+
+        # Remove suffixes
+        suffixes_to_remove = [
+            r'\s*-\s*Early Access$',
+            r'\s*\(Reissue\)$',
+            r'\s*\(In Person\)$',
+            r'\s*\(Cinematographer In Person\)$',
+            r'\s*-\s*Hong Kong Cinema Classics$',
+        ]
+        for pattern in suffixes_to_remove:
+            cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+
         # Extract from "X Presents MOVIE" patterns
         presents_patterns = [
             r'Cinematic Void Presents (.+)',
             r'The Greg Proops Film Club Presents (.+)',
             r'JANS:\s*(.+)',
+            r'Met Op:\s*(.+)',
         ]
         for pattern in presents_patterns:
             match = re.match(pattern, cleaned, re.IGNORECASE)
             if match:
                 cleaned = match.group(1).strip()
                 break
-        
+
         # Convert from ALL CAPS
         if cleaned.isupper() and len(cleaned) > 3:
             cleaned = cleaned.title()
-        
+
         return cleaned
+
+    def _extract_year(self, title: str) -> tuple:
+        """Extract year from title like 'Movie (1993)' or 'Movie (2026)'"""
+        match = re.search(r'\((\d{4})\)', title)
+        if match:
+            year = int(match.group(1))
+            clean_title = re.sub(r'\s*\(\d{4}\)', '', title).strip()
+            return clean_title, year
+        return title, None
 
     
     def _try_search(self, title: str, year: int = None, use_fuzzy: bool = True) -> dict:

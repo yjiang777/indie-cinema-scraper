@@ -141,7 +141,7 @@ def search():
     try:
         # Get query parameters
         query = request.args.get('q', '').strip()
-        theater_id = request.args.get('theater', '')
+        theaters_str = request.args.get('theaters', '')  # comma-separated theater IDs
         date_filter = request.args.get('date', 'week')  # today, week, month, custom
         format_filter = request.args.get('format', '')
         start_date_str = request.args.get('start_date', '')
@@ -159,10 +159,12 @@ def search():
                 (Movie.director.ilike(f'%{query}%'))
             )
 
-        if theater_id:
-            screenings_query = screenings_query.filter(
-                Theater.id == int(theater_id)
-            )
+        if theaters_str:
+            theater_ids = [int(tid) for tid in theaters_str.split(',') if tid.strip()]
+            if theater_ids:
+                screenings_query = screenings_query.filter(
+                    Theater.id.in_(theater_ids)
+                )
 
         if format_filter:
             screenings_query = screenings_query.filter(

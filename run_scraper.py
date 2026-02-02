@@ -11,8 +11,12 @@ from scrapers.models.base import engine, SessionLocal, init_db
 from scrapers.models.theater import Theater
 from scrapers.models.movie import Movie
 from scrapers.models.screening import Screening
+from scrapers.services.tmdb_service import TMDBService
 
 from scrapers.new_beverly.scraper import NewBeverlyScraper
+
+# Initialize TMDB service for movie enrichment
+tmdb_service = TMDBService()
 from scrapers.laemmle.scraper import LaemmleScraper
 from scrapers.laemmle.theaters import LAEMMLE_THEATERS
 
@@ -52,9 +56,9 @@ def get_or_create_theater(session, name, address, city, state, website, latitude
 
 
 def get_or_create_movie(session, title, runtime=None, movie_format=None):
-    """Get existing movie or create new one"""
+    """Get existing movie or create new one, enrich with TMDB data"""
     movie = session.query(Movie).filter_by(title=title).first()
-    
+
     if not movie:
         movie = Movie(
             title=title,
@@ -63,8 +67,28 @@ def get_or_create_movie(session, title, runtime=None, movie_format=None):
         )
         session.add(movie)
         session.commit()
-        print(f"   Created movie: {title}")
-    
+
+        # Enrich with TMDB data immediately
+        try:
+            is_tv = any(kw in title.upper() for kw in ['SEASON', 'EPISODE', 'EP.', 'WELCOME TO DERRY'])
+            if is_tv:
+                tmdb_data = tmdb_service.search_tv_show(title)
+            else:
+                tmdb_data = tmdb_service.search_movie(title)
+
+            if tmdb_data:
+                movie.director = tmdb_data.get('director')
+                movie.poster_url = tmdb_data.get('poster_url')
+                movie.tmdb_id = tmdb_data.get('tmdb_id')
+                if not movie.runtime and tmdb_data.get('runtime'):
+                    movie.runtime = tmdb_data.get('runtime')
+                session.commit()
+                print(f"   Created movie: {title} ✓")
+            else:
+                print(f"   Created movie: {title} (no poster)")
+        except Exception as e:
+            print(f"   Created movie: {title} (TMDB error)")
+
     return movie
 
 

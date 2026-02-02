@@ -18,6 +18,60 @@
         outline: none;
         border-color: #667eea;
     }
+    /* Multi-select dropdown */
+    .multi-select-dropdown {
+        position: relative;
+        min-width: 180px;
+    }
+    .multi-select-button {
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 5px;
+        background: white;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 1em;
+    }
+    .multi-select-button:hover {
+        border-color: #667eea;
+    }
+    .dropdown-arrow {
+        font-size: 0.7em;
+        margin-left: 10px;
+    }
+    .multi-select-options {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 2px solid #e0e0e0;
+        border-top: none;
+        border-radius: 0 0 5px 5px;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 100;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .multi-select-options.show {
+        display: block;
+    }
+    .multi-select-option {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        cursor: pointer;
+        font-size: 0.95em;
+    }
+    .multi-select-option:hover {
+        background: #f5f5f5;
+    }
+    .multi-select-option input {
+        margin-right: 10px;
+    }
 </style>
 {% endblock %}
 
@@ -34,12 +88,20 @@
                placeholder="Search movies or directors..."
                onkeyup="handleSearch(event)">
         
-        <select id="theaterFilter" onchange="filterScreenings()">
-            <option value="">All Theaters</option>
-            {% for theater in theaters %}
-            <option value="{{ theater.id }}">{{ theater.name }}</option>
-            {% endfor %}
-        </select>
+        <div class="multi-select-dropdown" id="theaterDropdown">
+            <div class="multi-select-button" onclick="toggleTheaterDropdown()">
+                <span id="theaterButtonText">All Theaters</span>
+                <span class="dropdown-arrow">▼</span>
+            </div>
+            <div class="multi-select-options" id="theaterOptions">
+                {% for theater in theaters %}
+                <label class="multi-select-option">
+                    <input type="checkbox" value="{{ theater.id }}" onchange="updateTheaterSelection()">
+                    {{ theater.name }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
         
         <select id="dateFilter" onchange="handleDateFilterChange()">
             <option value="week">This Week</option>
@@ -183,7 +245,41 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        const dropdown = document.getElementById('theaterDropdown');
+        if (!dropdown.contains(e.target)) {
+            document.getElementById('theaterOptions').classList.remove('show');
+        }
+    });
 });
+
+// Multi-select theater dropdown functions
+function toggleTheaterDropdown() {
+    document.getElementById('theaterOptions').classList.toggle('show');
+}
+
+function updateTheaterSelection() {
+    const checkboxes = document.querySelectorAll('#theaterOptions input[type="checkbox"]');
+    const selected = Array.from(checkboxes).filter(cb => cb.checked);
+    const buttonText = document.getElementById('theaterButtonText');
+
+    if (selected.length === 0) {
+        buttonText.textContent = 'All Theaters';
+    } else if (selected.length === 1) {
+        buttonText.textContent = selected[0].parentElement.textContent.trim();
+    } else {
+        buttonText.textContent = `${selected.length} theaters`;
+    }
+
+    filterScreenings();
+}
+
+function getSelectedTheaters() {
+    const checkboxes = document.querySelectorAll('#theaterOptions input[type="checkbox"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value);
+}
 
 function handleSearch(event) {
     if (event.key === 'Enter') {
@@ -237,7 +333,7 @@ async function addToWatchlist(screeningId, event) {
 
 async function filterScreenings() {
     const query = document.getElementById('searchInput').value;
-    const theater = document.getElementById('theaterFilter').value;
+    const theaters = getSelectedTheaters();
     const date = document.getElementById('dateFilter').value;
     const format = document.getElementById('formatFilter').value;
 
@@ -245,7 +341,7 @@ async function filterScreenings() {
 
     const params = new URLSearchParams();
     if (query) params.append('q', query);
-    if (theater) params.append('theater', theater);
+    if (theaters.length > 0) params.append('theaters', theaters.join(','));
     if (date) params.append('date', date);
     if (format) params.append('format', format);
 
