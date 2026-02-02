@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}{{ theater.name }} - LA Indie Cinema{% endblock %}
+
+{% block content %}
+<div class="theater-header">
+    <a href="/" class="back-link">← Back to all screenings</a>
+    <h1>{{ theater.name }}</h1>
+
+    <div class="theater-info">
+        {% if theater.address %}
+        <p class="theater-address">
+            📍 {{ theater.address }}{% if theater.city %}, {{ theater.city }}{% endif %}{% if theater.state %}, {{ theater.state }}{% endif %}
+        </p>
+        {% endif %}
+
+        {% if theater.website %}
+        <p class="theater-website">
+            🌐 <a href="{{ theater.website }}" target="_blank">{{ theater.website }}</a>
+        </p>
+        {% endif %}
+    </div>
+
+    {% if theater.description %}
+    <div class="theater-description">
+        <p>{{ theater.description }}</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="theater-screenings">
+    <h2>Upcoming Screenings</h2>
+
+    {% if screenings %}
+    <div id="screeningsList">
+        {% for screening in screenings %}
+        <div class="screening-card">
+            {% if screening.poster_url %}
+            <img src="{{ screening.poster_url }}"
+                alt="{{ screening.movie_title }}"
+                class="screening-poster"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="screening-poster-placeholder" style="display:none;">
+                <span>🎬</span>
+            </div>
+            {% else %}
+            <div class="screening-poster-placeholder">
+                <span>🎬</span>
+            </div>
+            {% endif %}
+
+            <div class="screening-header">
+                <div>
+                    <div class="movie-title">
+                        {{ screening.movie_title }}
+                        {% if screening.format != 'Digital' %}
+                        <span class="format-badge special">{{ screening.format }}</span>
+                        {% endif %}
+                    </div>
+                    {% if screening.director %}
+                    <div style="color: #667eea; font-size: 0.9em; margin-top: 3px;">
+                        {% if screening.director == 'TV Series' %}
+                            📺 TV Series
+                        {% else %}
+                            Directed by {{ screening.director }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    <div class="screening-info">
+                        <span>📅 {{ screening.formatted_date }}</span>
+                        <span>🕐 {{ screening.formatted_time }}</span>
+                        {% if screening.runtime %}
+                        <span>⏱️ {{ screening.runtime }} min</span>
+                        {% endif %}
+                    </div>
+                    {% if screening.special_notes %}
+                    <div style="color: #666; margin-top: 5px;">
+                        ℹ️ {{ screening.special_notes }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="screening-actions">
+                    {% if screening.ticket_url %}
+                    <a href="{{ screening.ticket_url }}" target="_blank" class="ticket-link">
+                        Get Tickets →
+                    </a>
+                    {% endif %}
+
+                    {% if current_user is defined and current_user.is_authenticated %}
+                    <button onclick="addToWatchlist({{ screening.id }}, event)"
+                            class="btn-watchlist"
+                            title="Add to watchlist">
+                        ⭐ Save
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="no-results">
+        <h3>No upcoming screenings</h3>
+        <p>Check back later for new showtimes</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .theater-header {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        margin-bottom: 30px;
+    }
+
+    .back-link {
+        color: #667eea;
+        text-decoration: none;
+        font-size: 0.9em;
+        display: inline-block;
+        margin-bottom: 15px;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    .theater-header h1 {
+        margin: 0 0 20px 0;
+        color: #1a1a2e;
+    }
+
+    .theater-info {
+        margin-bottom: 20px;
+    }
+
+    .theater-info p {
+        margin: 8px 0;
+        color: #555;
+    }
+
+    .theater-website a {
+        color: #667eea;
+        text-decoration: none;
+    }
+
+    .theater-website a:hover {
+        text-decoration: underline;
+    }
+
+    .theater-description {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+    }
+
+    .theater-description p {
+        margin: 0;
+        line-height: 1.6;
+        color: #444;
+    }
+
+    .theater-screenings h2 {
+        color: #1a1a2e;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function addToWatchlist(screeningId, event) {
+    event.stopPropagation();
+
+    const response = await fetch('/api/watchlist', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({screening_id: screeningId})
+    });
+
+    if (response.ok) {
+        const button = event.target;
+        button.textContent = '✅ Saved';
+        button.disabled = true;
+        button.style.background = '#4CAF50';
+
+        setTimeout(() => {
+            button.textContent = '⭐ Save';
+            button.disabled = false;
+            button.style.background = '';
+        }, 2000);
+    } else {
+        alert('Error adding to watchlist');
+    }
+}
+</script>
+{% endblock %}

@@ -180,7 +180,7 @@
                         </div>
                         {% endif %}
                         <div class="screening-info">
-                            <span>📍 <span class="theater-name">{{ screening.theater_name }}</span></span>
+                            <span>📍 <a href="/theater/{{ screening.theater_id }}" class="theater-link">{{ screening.theater_name }}</a></span>
                             <span>📅 {{ screening.formatted_date }}</span>
                             <span>🕐 {{ screening.formatted_time }}</span>
                             {% if screening.runtime %}
@@ -491,7 +491,7 @@ function displayScreenings(screenings) {
                         </div>
                         ${director}
                         <div class="screening-info">
-                            <span>📍 <span class="theater-name">${screening.theater_name}</span></span>
+                            <span>📍 <a href="/theater/${screening.theater_id}" class="theater-link">${screening.theater_name}</a></span>
                             <span>📅 ${screening.formatted_date}</span>
                             <span>🕐 ${screening.formatted_time}</span>
                             ${runtime}

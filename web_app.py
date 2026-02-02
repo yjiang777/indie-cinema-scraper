@@ -108,6 +108,7 @@ def index():
                 'id': screening.id,
                 'movie_title': screening.movie.title,
                 'director': screening.movie.director,
+                'theater_id': screening.theater.id,
                 'theater_name': screening.theater.name,
                 'theater_city': screening.theater.city,
                 'datetime': screening.screening_datetime,
@@ -208,6 +209,7 @@ def search():
                 'id': screening.id,
                 'movie_title': screening.movie.title,
                 'director': screening.movie.director,
+                'theater_id': screening.theater.id,
                 'theater_name': screening.theater.name,
                 'theater_city': screening.theater.city,
                 'datetime': screening.screening_datetime.isoformat(),
@@ -343,6 +345,51 @@ def api_theaters():
             'theaters': theater_list
         })
     
+    finally:
+        session.close()
+
+
+@app.route('/theater/<int:theater_id>')
+def theater_detail(theater_id):
+    """Individual theater page with details and screenings"""
+    session = SessionLocal()
+
+    try:
+        now = get_now_naive()
+
+        # Get theater
+        theater = session.query(Theater).filter(Theater.id == theater_id).first()
+        if not theater:
+            return "Theater not found", 404
+
+        # Get upcoming screenings for this theater
+        screenings = session.query(Screening).join(Movie)\
+            .filter(Screening.theater_id == theater_id)\
+            .filter(Screening.screening_datetime >= now)\
+            .order_by(Screening.screening_datetime)\
+            .limit(50)\
+            .all()
+
+        formatted_screenings = []
+        for screening in screenings:
+            screen_time = format_screening_time(screening.screening_datetime)
+            formatted_screenings.append({
+                'id': screening.id,
+                'movie_title': screening.movie.title,
+                'director': screening.movie.director,
+                'formatted_date': screen_time.strftime('%a, %b %d'),
+                'formatted_time': screen_time.strftime('%I:%M %p'),
+                'format': screening.movie.format or 'Digital',
+                'poster_url': screening.movie.poster_url,
+                'runtime': screening.movie.runtime,
+                'ticket_url': screening.ticket_url,
+                'special_notes': screening.special_notes
+            })
+
+        return render_template('theater.html',
+                             theater=theater,
+                             screenings=formatted_screenings)
+
     finally:
         session.close()
 

@@ -27,6 +27,56 @@ def ensure_database_exists():
     db_dir.mkdir(exist_ok=True)
 
 
+def run_migrations():
+    """Run database migrations"""
+    from sqlalchemy import text, inspect
+
+    inspector = inspect(engine)
+    columns = [col['name'] for col in inspector.get_columns('theaters')]
+
+    # Add description column if it doesn't exist
+    if 'description' not in columns:
+        with engine.connect() as conn:
+            conn.execute(text('ALTER TABLE theaters ADD COLUMN description TEXT'))
+            conn.commit()
+            print("Migration: Added description column to theaters")
+
+
+def populate_theater_descriptions():
+    """Populate theater descriptions if empty"""
+    descriptions = {
+        'New Beverly Cinema': 'A beloved Los Angeles repertory cinema owned by Quentin Tarantino, showing classic films on 35mm.',
+        'American Cinematheque - Aero Theatre': 'Historic Art Deco theater in Santa Monica presenting classic and contemporary films.',
+        'American Cinematheque - Egyptian Theatre': 'Iconic Hollywood Boulevard landmark showcasing curated film programs.',
+        'American Cinematheque - Los Feliz 3': 'Three-screen venue featuring independent, foreign, and repertory films.',
+        'Laemmle Royal': 'Arthouse cinema dedicated to independent and foreign films in West LA.',
+        'Laemmle Monica Film Center': 'Santa Monica arthouse cinema showing independent and documentary films.',
+        'Laemmle Glendale': 'Glendale location featuring art house and international cinema.',
+        'Laemmle NoHo 7': 'North Hollywood venue dedicated to indie and foreign films.',
+        'Laemmle Town Center 5': 'Encino theater showcasing independent and international cinema.',
+        'Laemmle Newhall': 'Santa Clarita arthouse theater bringing indie films to the valley.',
+        'Landmark Nuart Theatre': 'West LA repertory cinema known for midnight movies and cult classics.',
+        'USC School of Cinematic Arts': 'University screening room featuring student films and classic cinema.',
+        'Fine Arts Theatre Beverly Hills': 'Historic single-screen theater showing first-run and classic films.',
+        'Regal LA Live Stadium 14': 'Premium multiplex at LA Live with IMAX and stadium seating.',
+        'Regal Edwards Long Beach Stadium 26': 'Large format cinema with IMAX and 4DX experiences.',
+        'Regal Alhambra Renaissance Stadium 14': 'Modern stadium theater serving the San Gabriel Valley.',
+        'Regal Paseo Stadium 14': 'Pasadena multiplex with premium large format screens.',
+        'Regal Garden Grove': 'Orange County location with stadium seating.',
+    }
+
+    session = SessionLocal()
+    updated = 0
+    for theater in session.query(Theater).all():
+        if theater.name in descriptions and not theater.description:
+            theater.description = descriptions[theater.name]
+            updated += 1
+    if updated:
+        session.commit()
+        print(f"Updated {updated} theater descriptions")
+    session.close()
+
+
 def get_or_create_theater(session, name, address, city, state, website, latitude=None, longitude=None):
     """Get existing theater or create new one"""
     theater = session.query(Theater).filter_by(name=name).first()
@@ -502,6 +552,8 @@ def main():
     """Main scraper execution"""
     ensure_database_exists()
     init_db()
+    run_migrations()
+    populate_theater_descriptions()
 
     session = SessionLocal()
 

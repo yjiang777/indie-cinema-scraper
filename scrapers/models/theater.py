@@ -17,6 +17,7 @@ class Theater(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     website = Column(String)
+    description = Column(String)  # Theater introduction/description
     
     # Relationship to screenings
     screenings = relationship("Screening", back_populates="theater")
