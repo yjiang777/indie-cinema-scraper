@@ -19,6 +19,26 @@ from scrapers.models.user import User
 # Initialize database
 init_db()
 
+# Run migrations to add any new columns
+def run_migrations():
+    """Run database migrations on startup"""
+    from sqlalchemy import text, inspect
+    from scrapers.models.base import engine
+
+    try:
+        inspector = inspect(engine)
+        columns = [col['name'] for col in inspector.get_columns('theaters')]
+
+        if 'description' not in columns:
+            with engine.connect() as conn:
+                conn.execute(text('ALTER TABLE theaters ADD COLUMN description TEXT'))
+                conn.commit()
+                print("Migration: Added description column to theaters")
+    except Exception as e:
+        print(f"Migration check: {e}")
+
+run_migrations()
+
 # Create Flask app FIRST
 app = Flask(__name__)
 
