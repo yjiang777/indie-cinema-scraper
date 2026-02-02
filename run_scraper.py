@@ -14,10 +14,20 @@ from scrapers.models.screening import Screening
 from scrapers.services.tmdb_service import TMDBService
 
 from scrapers.new_beverly.scraper import NewBeverlyScraper
-
-# Initialize TMDB service for movie enrichment
-tmdb_service = TMDBService()
 from scrapers.laemmle.scraper import LaemmleScraper
+
+# Initialize TMDB service lazily
+tmdb_service = None
+
+def get_tmdb_service():
+    global tmdb_service
+    if tmdb_service is None:
+        try:
+            tmdb_service = TMDBService()
+        except ValueError:
+            print("Warning: TMDB_API_KEY not set, skipping enrichment")
+            return None
+    return tmdb_service
 from scrapers.laemmle.theaters import LAEMMLE_THEATERS
 
 
@@ -132,11 +142,16 @@ def get_or_create_movie(session, title, runtime=None, movie_format=None):
 
         # Enrich with TMDB data immediately
         try:
+            tmdb = get_tmdb_service()
+            if not tmdb:
+                print(f"   Created movie: {title}")
+                return movie
+
             is_tv = any(kw in title.upper() for kw in ['SEASON', 'EPISODE', 'EP.', 'WELCOME TO DERRY'])
             if is_tv:
-                tmdb_data = tmdb_service.search_tv_show(title)
+                tmdb_data = tmdb.search_tv_show(title)
             else:
-                tmdb_data = tmdb_service.search_movie(title)
+                tmdb_data = tmdb.search_movie(title)
 
             if tmdb_data:
                 movie.director = tmdb_data.get('director')
