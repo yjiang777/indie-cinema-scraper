@@ -31,20 +31,30 @@ def run_migrations():
     """Run database migrations"""
     from sqlalchemy import text, inspect
 
-    inspector = inspect(engine)
-    columns = [col['name'] for col in inspector.get_columns('theaters')]
+    try:
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
 
-    # Add description column if it doesn't exist
-    if 'description' not in columns:
-        with engine.connect() as conn:
-            conn.execute(text('ALTER TABLE theaters ADD COLUMN description TEXT'))
-            conn.commit()
-            print("Migration: Added description column to theaters")
+        # Only run if theaters table exists
+        if 'theaters' not in tables:
+            return
+
+        columns = [col['name'] for col in inspector.get_columns('theaters')]
+
+        # Add description column if it doesn't exist
+        if 'description' not in columns:
+            with engine.connect() as conn:
+                conn.execute(text('ALTER TABLE theaters ADD COLUMN description TEXT'))
+                conn.commit()
+                print("Migration: Added description column to theaters")
+    except Exception as e:
+        print(f"Migration warning: {e}")
 
 
 def populate_theater_descriptions():
     """Populate theater descriptions if empty"""
-    descriptions = {
+    try:
+        descriptions = {
         'New Beverly Cinema': 'A beloved Los Angeles repertory cinema owned by Quentin Tarantino, showing classic films on 35mm.',
         'American Cinematheque - Aero Theatre': 'Historic Art Deco theater in Santa Monica presenting classic and contemporary films.',
         'American Cinematheque - Egyptian Theatre': 'Iconic Hollywood Boulevard landmark showcasing curated film programs.',
@@ -65,16 +75,18 @@ def populate_theater_descriptions():
         'Regal Garden Grove': 'Orange County location with stadium seating.',
     }
 
-    session = SessionLocal()
-    updated = 0
-    for theater in session.query(Theater).all():
-        if theater.name in descriptions and not theater.description:
-            theater.description = descriptions[theater.name]
-            updated += 1
-    if updated:
-        session.commit()
-        print(f"Updated {updated} theater descriptions")
-    session.close()
+        session = SessionLocal()
+        updated = 0
+        for theater in session.query(Theater).all():
+            if theater.name in descriptions and not theater.description:
+                theater.description = descriptions[theater.name]
+                updated += 1
+        if updated:
+            session.commit()
+            print(f"Updated {updated} theater descriptions")
+        session.close()
+    except Exception as e:
+        print(f"Theater descriptions warning: {e}")
 
 
 def get_or_create_theater(session, name, address, city, state, website, latitude=None, longitude=None):
