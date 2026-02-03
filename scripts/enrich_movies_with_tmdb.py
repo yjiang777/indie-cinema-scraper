@@ -1,5 +1,6 @@
 """Enrich movie database with TMDB metadata"""
 import sys
+import argparse
 from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
@@ -10,7 +11,7 @@ from scrapers.models.movie import Movie
 from scrapers.models.screening import Screening  # ← Add Screening
 from scrapers.services.tmdb_service import TMDBService
 
-def enrich_movies():
+def enrich_movies(force=False, retry_missing=False):
     """Enrich movies with TMDB data"""
     init_db()
     session = SessionLocal()
@@ -29,10 +30,16 @@ def enrich_movies():
     
     for idx, movie in enumerate(movies, 1):
         print(f"[{idx}/{len(movies)}] {movie.title}... ", end='', flush=True)
-        
-        # Skip if already has both director AND poster
-        if movie.director and movie.poster_url:
+
+        # Skip if already has both director AND poster (unless force or retry_missing)
+        if movie.director and movie.poster_url and not force:
             print("(already enriched)")
+            skipped += 1
+            continue
+
+        # Skip if has tmdb_id but missing poster (unless retry_missing or force)
+        if movie.tmdb_id and not movie.poster_url and not retry_missing and not force:
+            print("(has tmdb_id, missing poster)")
             skipped += 1
             continue
         
@@ -47,13 +54,14 @@ def enrich_movies():
             tmdb_data = tmdb_service.search_movie(movie.title, movie.year)
         
         if tmdb_data:
-            if not movie.director:
+            # When force is enabled, always update; otherwise only update if empty
+            if force or not movie.director:
                 movie.director = tmdb_data.get('director')
-            if not movie.poster_url:
+            if force or not movie.poster_url:
                 movie.poster_url = tmdb_data.get('poster_url')
-            if not movie.tmdb_id:
+            if force or not movie.tmdb_id:
                 movie.tmdb_id = tmdb_data.get('tmdb_id')
-            if not movie.runtime:
+            if force or not movie.runtime:
                 movie.runtime = tmdb_data.get('runtime')
             session.commit()
             enriched += 1
@@ -71,4 +79,8 @@ def enrich_movies():
 
 
 if __name__ == "__main__":
-    enrich_movies()
+    parser = argparse.ArgumentParser(description='Enrich movies with TMDB metadata')
+    parser.add_argument('--force', action='store_true', help='Re-enrich all movies, even if already enriched')
+    parser.add_argument('--retry-missing', action='store_true', help='Retry movies that have tmdb_id but missing poster')
+    args = parser.parse_args()
+    enrich_movies(force=args.force, retry_missing=args.retry_missing)
