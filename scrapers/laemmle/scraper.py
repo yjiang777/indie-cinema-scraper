@@ -47,17 +47,27 @@ class LaemmleScraper:
             film_wrapper = info_div.select_one('div.film-info-wrapper')
             if not film_wrapper:
                 continue
-            
+
             # Extract title
             title_elem = film_wrapper.select_one('div.title a')
             if not title_elem:
                 continue
-            
+
             raw_title = title_elem.get_text().strip()
             title = normalize_title(raw_title)
             film_url = title_elem.get('href', '')
             if film_url and not film_url.startswith('http'):
                 film_url = self.base_url + film_url
+
+            # Extract poster image
+            poster_url = None
+            poster_img = info_div.select_one('img')
+            if poster_img and poster_img.get('src'):
+                poster_src = poster_img.get('src')
+                if poster_src.startswith('http'):
+                    poster_url = poster_src
+                else:
+                    poster_url = self.base_url + poster_src
             
             # Extract runtime and rating
             detail_elem = film_wrapper.select_one('div.detail')
@@ -114,7 +124,8 @@ class LaemmleScraper:
                     'ticket_url': film_url,  # Use film page as ticket URL
                     'format': film_format,
                     'runtime': runtime,
-                    'rating': rating
+                    'rating': rating,
+                    'poster_url': poster_url
                 })
         
         return screenings

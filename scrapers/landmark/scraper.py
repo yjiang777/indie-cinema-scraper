@@ -81,17 +81,19 @@ class LandmarkAPI:
             movie_info = movie_details.get(movie_id, {})
             movie_title = movie_info.get('title', f'Unknown Movie {movie_id}')
             movie_runtime = movie_info.get('runtime')  # In seconds
-            
+            movie_poster = movie_info.get('poster_url')
+
             # Convert runtime from seconds to minutes
             runtime_minutes = int(movie_runtime / 60) if movie_runtime else None
-            
+
             for date_str, showtimes in dates.items():
                 for showtime in showtimes:
                     screening = self._parse_showtime(
-                        showtime, 
-                        movie_title, 
+                        showtime,
+                        movie_title,
                         runtime_minutes,
-                        movie_id
+                        movie_id,
+                        movie_poster
                     )
                     if screening:
                         screenings.append(screening)
@@ -118,10 +120,10 @@ class LandmarkAPI:
     def _fetch_movie_details(self, movie_ids: List[str]) -> Dict:
         """
         Fetch movie details from movies API
-        
+
         Args:
             movie_ids: List of movie IDs
-        
+
         Returns:
             Dict mapping movie_id to movie details
         """
@@ -130,64 +132,69 @@ class LandmarkAPI:
             'basic': 'false',
             'castingLimit': '3'
         }
-        
+
         # Add each movie ID as a separate parameter
         url_parts = [self.MOVIES_API + '?basic=false&castingLimit=3']
         for movie_id in movie_ids:
             url_parts.append(f'ids={movie_id}')
-        
+
         url = url_parts[0] + '&' + '&'.join(url_parts[1:])
-        
+
         try:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
             movies_list = response.json()
-            
+
             # Convert list to dict keyed by ID
             movies_dict = {}
             for movie in movies_list:
                 movie_id = str(movie.get('id'))
+                # Extract poster URL from images array
+                images = movie.get('images', [])
+                if images:
+                    movie['poster_url'] = images[0].get('url')
                 movies_dict[movie_id] = movie
-            
+
             return movies_dict
-            
+
         except requests.RequestException as e:
             print(f"   ⚠️  Error fetching movie details: {e}")
             return {}
     
-    def _parse_showtime(self, showtime: Dict, movie_title: str, runtime: Optional[int], movie_id: str) -> Optional[Dict]:
+    def _parse_showtime(self, showtime: Dict, movie_title: str, runtime: Optional[int], movie_id: str, poster_url: Optional[str] = None) -> Optional[Dict]:
         """Parse a single showtime"""
         try:
             # Parse datetime
             starts_at = showtime.get('startsAt')  # "2026-01-06T17:00:00"
             if not starts_at:
                 return None
-            
+
             dt = datetime.fromisoformat(starts_at)
             dt_with_tz = self.timezone.localize(dt)
-            
+
             # Check if expired or in the past
             now = datetime.now(self.timezone)
             if dt_with_tz < now or showtime.get('isExpired', False):
                 return None
-            
+
             # Extract format from tags
             tags = showtime.get('tags', [])
             film_format = self._extract_format_from_tags(tags)
-            
+
             # Get ticket URL
             ticket_url = self._extract_ticket_url(showtime)
-            
+
             # Clean title
             title = normalize_title(movie_title)
-            
+
             return {
                 'title': title,
                 'datetime': dt_with_tz,
                 'ticket_url': ticket_url,
                 'format': film_format,
                 'runtime': runtime,
-                'movie_id': movie_id
+                'movie_id': movie_id,
+                'poster_url': poster_url
             }
             
         except Exception as e:

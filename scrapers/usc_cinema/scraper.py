@@ -96,17 +96,28 @@ class USCCinemaScraper:
             location = None
             if len(h5_tags) > 1:
                 location = h5_tags[1].get_text().strip()
-            
+
+            # Get poster image
+            poster_url = None
+            img = item.find('img')
+            if img and img.get('src'):
+                poster_src = img.get('src')
+                if poster_src.startswith('http'):
+                    poster_url = poster_src
+                else:
+                    poster_url = self.BASE_URL + poster_src
+
             # Clean title
             title = normalize_title(raw_title)
-            
+
             return {
                 'title': title,
                 'datetime': screening_datetime,
                 'ticket_url': event_url,
                 'format': 'Digital',  # Default, can be updated if we find format info
                 'runtime': None,
-                'special_notes': location
+                'special_notes': location,
+                'poster_url': poster_url
             }
             
         except Exception as e:

@@ -117,16 +117,20 @@ class AmericanCinemathequeAPI:
             
             # Get URL
             ticket_url = event.get('url', '')
-            
+
             # Extract format from title or excerpt
             excerpt = event.get('event_card_excerpt', '')
             full_text = f"{raw_title} {excerpt}"
             film_format = extract_format(full_text)
-            
+
             # Get runtime if available (end_time - start_time)
             end_time_str = event.get('event_end_time', '')
             runtime = self._calculate_runtime(time_str, end_time_str) if end_time_str else None
-            
+
+            # Get poster from event_card_image
+            event_card_image = event.get('event_card_image', {})
+            poster_url = event_card_image.get('url') if isinstance(event_card_image, dict) else None
+
             return {
                 'title': title,
                 'datetime': screening_datetime,
@@ -135,7 +139,8 @@ class AmericanCinemathequeAPI:
                 'runtime': runtime,
                 'theater_name': theater_name,
                 'theater_id': theater_id,
-                'special_notes': self._extract_special_notes(excerpt)
+                'special_notes': self._extract_special_notes(excerpt),
+                'poster_url': poster_url
             }
             
         except Exception as e:

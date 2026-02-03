@@ -112,7 +112,7 @@ def get_or_create_theater(session, name, address, city, state, website, latitude
     return theater
 
 
-def get_or_create_movie(session, title, runtime=None, movie_format=None):
+def get_or_create_movie(session, title, runtime=None, movie_format=None, poster_url=None):
     """Get existing movie or create new one"""
     movie = session.query(Movie).filter_by(title=title).first()
 
@@ -120,11 +120,16 @@ def get_or_create_movie(session, title, runtime=None, movie_format=None):
         movie = Movie(
             title=title,
             runtime=runtime,
-            format=movie_format
+            format=movie_format,
+            poster_url=poster_url
         )
         session.add(movie)
         session.commit()
         print(f"   Created movie: {title}")
+    elif poster_url and not movie.poster_url:
+        # Update poster if we have one and movie doesn't
+        movie.poster_url = poster_url
+        session.commit()
 
     return movie
 
@@ -235,13 +240,14 @@ def scrape_new_beverly(session):
             session,
             title=screening_data['title'],
             runtime=screening_data.get('runtime'),
-            movie_format=screening_data.get('format')
+            movie_format=screening_data.get('format'),
+            poster_url=screening_data.get('poster_url')
         )
-        
+
         if save_screening(session, movie, theater, screening_data):
             print(f"   ✅ Saved: {screening_data['title']} - {screening_data['datetime'].strftime('%b %d, %I:%M %p')}")
             new_count += 1
-    
+
     print(f"\n✅ Added {new_count} new screenings")
 
 
@@ -280,17 +286,18 @@ def scrape_laemmle(session):
                 session,
                 title=screening_data['title'],
                 runtime=screening_data.get('runtime'),
-                movie_format=screening_data.get('format')
+                movie_format=screening_data.get('format'),
+                poster_url=screening_data.get('poster_url')
             )
-            
+
             if save_screening(session, movie, theater, screening_data):
                 new_count += 1
-        
+
         total_scraped += len(screenings)
         total_new_screenings += new_count
-        
+
         print(f" → {new_count} new")
-    
+
     print(f"\n{'='*60}")
     print(f"✅ Laemmle: {total_new_screenings} new screenings (scraped {total_scraped} total)")
     print(f"{'='*60}")
@@ -329,23 +336,24 @@ def scrape_american_cinematheque(session):
         # Get theater from API ID
         theater_id = screening_data.get('theater_id')
         theater = theaters_by_id.get(theater_id)
-        
+
         if not theater:
             print(f"   ⚠️  Unknown theater ID: {theater_id}")
             continue
-        
+
         # Create movie
         movie = get_or_create_movie(
             session,
             title=screening_data['title'],
             runtime=screening_data.get('runtime'),
-            movie_format=screening_data.get('format')
+            movie_format=screening_data.get('format'),
+            poster_url=screening_data.get('poster_url')
         )
-        
+
         # Create screening
         if save_screening(session, movie, theater, screening_data):
             new_count += 1
-    
+
     print(f"\n✅ Added {new_count} new screenings from American Cinematheque")
 def scrape_landmark(session):
     """Scrape Landmark Theatres"""
@@ -384,15 +392,16 @@ def scrape_landmark(session):
                 session,
                 title=screening_data['title'],
                 runtime=screening_data.get('runtime'),
-                movie_format=screening_data.get('format')
+                movie_format=screening_data.get('format'),
+                poster_url=screening_data.get('poster_url')
             )
-            
+
             if save_screening(session, movie, theater, screening_data):
                 new_count += 1
-        
+
         total_new_screenings += new_count
         print(f" → {new_count} new")
-    
+
     print(f"\n{'='*60}")
     print(f"✅ Landmark: {total_new_screenings} new screenings")
     print(f"{'='*60}")
@@ -422,18 +431,19 @@ def scrape_usc_cinema(session):
     
     print(f"\n💾 Saving {len(screenings)} screenings to database...")
     new_count = 0
-    
+
     for screening_data in screenings:
         movie = get_or_create_movie(
             session,
             title=screening_data['title'],
             runtime=screening_data.get('runtime'),
-            movie_format=screening_data.get('format')
+            movie_format=screening_data.get('format'),
+            poster_url=screening_data.get('poster_url')
         )
-        
+
         if save_screening(session, movie, theater, screening_data):
             new_count += 1
-    
+
     print(f"✅ Added {new_count} new screenings from USC Cinema")
 
 def scrape_regal(session):
@@ -483,15 +493,16 @@ def scrape_regal(session):
                 session,
                 title=screening_data['title'],
                 runtime=screening_data.get('runtime'),
-                movie_format=screening_data.get('format')
+                movie_format=screening_data.get('format'),
+                poster_url=screening_data.get('poster_url')
             )
-            
+
             if save_screening(session, movie, theater, screening_data):
                 new_count += 1
-        
+
         total_new_screenings += new_count
         print(f" → {new_count} new")
-    
+
     print(f"\n{'='*60}")
     print(f"✅ Regal: {total_new_screenings} new screenings")
     print(f"{'='*60}")
@@ -526,7 +537,8 @@ def scrape_fine_arts(session):
         movie = get_or_create_movie(
             session,
             title=screening_data['title'],
-            movie_format=screening_data.get('format')
+            movie_format=screening_data.get('format'),
+            poster_url=screening_data.get('poster_url')
         )
 
         if save_screening(session, movie, theater, screening_data):

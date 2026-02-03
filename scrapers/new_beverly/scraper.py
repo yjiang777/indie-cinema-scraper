@@ -44,7 +44,13 @@ class NewBeverlyScraper:
                         url = link.get('href')
                         if not url.startswith('http'):
                             url = self.BASE_URL + url
-                        
+
+                        # Extract poster image if available
+                        poster_url = None
+                        img = link.find('img')
+                        if img and img.get('src'):
+                            poster_url = img.get('src')
+
                         # Get full text and split by lines
                         full_text = link.get_text()
                         lines = [line.strip() for line in full_text.split('\n') if line.strip()]
@@ -109,7 +115,8 @@ class NewBeverlyScraper:
                                         'datetime': screening_datetime,
                                         'ticket_url': url,
                                         'format': format_type,
-                                        'special_notes': None
+                                        'special_notes': None,
+                                        'poster_url': poster_url
                                     }
                                     screenings.append(screening)
                         else:
@@ -117,18 +124,19 @@ class NewBeverlyScraper:
                             time = times[0] if times else None
                             if not time:
                                 continue
-                            
+
                             for title in titles:
                                 normalized_title = normalize_title(title)
                                 screening_datetime = parse_new_beverly_date(date_text, time, current_year)
-                                
+
                                 if screening_datetime and normalized_title:
                                     screening = {
                                         'title': normalized_title,
                                         'datetime': screening_datetime,
                                         'ticket_url': url,
                                         'format': format_type,
-                                        'special_notes': None
+                                        'special_notes': None,
+                                        'poster_url': poster_url
                                     }
                                     screenings.append(screening)
                             

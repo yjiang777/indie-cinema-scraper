@@ -56,9 +56,13 @@ class RegalScraper:
                 return []
 
             data = json.loads(next_data.string)
+            page_props = data.get('props', {}).get('pageProps', {})
+
+            # Build poster lookup from movies data
+            poster_lookup = self._build_poster_lookup(page_props.get('movies', []))
 
             # Get showtimes for this specific date
-            showtimes_data = data.get('props', {}).get('pageProps', {}).get('showtimes', [])
+            showtimes_data = page_props.get('showtimes', [])
 
             if not showtimes_data:
                 print(" 0 films")
@@ -71,9 +75,10 @@ class RegalScraper:
             for film in films:
                 title = film.get('Title', '')
                 performances = film.get('Performances', [])
+                poster_url = poster_lookup.get(title)
 
                 for performance in performances:
-                    screening = self._parse_performance(title, performance)
+                    screening = self._parse_performance(title, performance, poster_url)
                     if screening:
                         screenings.append(screening)
 
@@ -85,46 +90,60 @@ class RegalScraper:
             print(f" ❌ Error: {e}")
 
         return screenings
+
+    def _build_poster_lookup(self, movies: List[Dict]) -> Dict[str, str]:
+        """Build a lookup from movie title to poster URL"""
+        lookup = {}
+        for movie in movies:
+            title = movie.get('Title', '')
+            media = movie.get('Media', [])
+            # Find poster image in media array
+            for item in media:
+                if item.get('Type') == 'Image' and 'Poster' in item.get('SubType', ''):
+                    lookup[title] = item.get('Url') or item.get('SecureUrl')
+                    break
+        return lookup
     
-    def _parse_performance(self, title: str, performance: Dict) -> Optional[Dict]:
+    def _parse_performance(self, title: str, performance: Dict, poster_url: Optional[str] = None) -> Optional[Dict]:
         """Parse a single performance/showtime"""
         try:
             # Get showtime
             showtime_str = performance.get('CalendarShowTime')
             if not showtime_str:
                 return None
-            
+
             # Parse datetime
             dt = datetime.fromisoformat(showtime_str.replace('Z', '+00:00'))
-            
+
             # Convert to theater timezone
             if dt.tzinfo is None:
                 dt_local = self.timezone.localize(dt)
             else:
                 dt_local = dt.astimezone(self.timezone)
-            
+
             # Filter out shows that have already started (more than 30 min ago)
             now = datetime.now(self.timezone)
             time_diff = (dt_local - now).total_seconds() / 60  # minutes
 
             if time_diff < -30:  # Started more than 30 min ago
                 return None
-            
+
             # Extract format from attributes
             attributes = performance.get('PerformanceAttributes', [])
             film_format = self._extract_format(attributes)
-            
+
             # Build ticket URL
             performance_id = performance.get('PerformanceId')
             ticket_url = f"https://www.regmovies.com/movies/{performance_id}" if performance_id else None
-            
+
             return {
                 'title': title,
                 'datetime': dt_local,
                 'ticket_url': ticket_url,
                 'format': film_format,
                 'runtime': None,
-                'special_notes': ', '.join(attributes) if attributes else None
+                'special_notes': ', '.join(attributes) if attributes else None,
+                'poster_url': poster_url
             }
             
         except Exception as e:
