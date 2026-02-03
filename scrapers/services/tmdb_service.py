@@ -79,14 +79,17 @@ class TMDBService:
         for pattern in suffixes_to_remove:
             cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
 
-        # Extract from "X Presents MOVIE" patterns
-        presents_patterns = [
+        # Extract from "PREFIX: MOVIE" patterns
+        prefix_patterns = [
             r'Cinematic Void Presents (.+)',
             r'The Greg Proops Film Club Presents (.+)',
             r'JANS:\s*(.+)',
             r'Met Op:\s*(.+)',
+            r'IMAX:\s*(.+)',
+            r'3D:\s*(.+)',
+            r'70mm:\s*(.+)',
         ]
-        for pattern in presents_patterns:
+        for pattern in prefix_patterns:
             match = re.match(pattern, cleaned, re.IGNORECASE)
             if match:
                 cleaned = match.group(1).strip()
